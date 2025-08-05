@@ -54,14 +54,14 @@ export default function SubscriptionsPage() {
         <h1 className="text-3xl font-bold font-headline">Explore Subscriptions</h1>
         <p className="text-muted-foreground">Find and customize the perfect plans for you.</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {subscriptionServices.map((service) => (
           <SubscriptionCard key={service.id} service={service} onCustomizeClick={handleCustomizeClick} />
         ))}
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="w-full sm:max-w-md p-0 flex flex-col">
+        <SheetContent className="w-full max-w-full p-0 flex flex-col">
           {selectedService && (
             <>
               <SheetHeader className="p-6">
