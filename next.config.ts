@@ -32,6 +32,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'images.icon-icons.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'www.oned.net',
+      },
     ],
   },
 };
