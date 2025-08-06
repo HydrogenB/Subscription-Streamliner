@@ -141,15 +141,17 @@ export default function AddBundlePage() {
     if (selectedServices.size >= MAX_SELECTION_LIMIT) {
         return { text: '', isIncremental: false };
     }
-
-    const potentialSelection = new Set(selectedServices);
     
+    let baseSelection = new Set(selectedServices);
     if (NETFLIX_PLANS.includes(serviceId)) {
-      const selectedNetflix = NETFLIX_PLANS.find(p => potentialSelection.has(p));
-      if (selectedNetflix) {
-        potentialSelection.delete(selectedNetflix);
-      }
+      NETFLIX_PLANS.forEach(plan => {
+        if (baseSelection.has(plan)) {
+          baseSelection.delete(plan);
+        }
+      });
     }
+  
+    const potentialSelection = new Set(baseSelection);
     potentialSelection.add(serviceId);
   
     const nextOffer = findBestOffer(potentialSelection);
@@ -157,11 +159,11 @@ export default function AddBundlePage() {
     if (nextOffer) {
       let currentTotal;
 
-      const currentOffer = findBestOffer(selectedServices);
+      const currentOffer = findBestOffer(baseSelection);
       if (currentOffer) {
         currentTotal = currentOffer.sellingPrice;
       } else {
-        currentTotal = Array.from(selectedServices).reduce((acc, id) => {
+        currentTotal = Array.from(baseSelection).reduce((acc, id) => {
             const service = subscriptionServices.find(s => s.id === id);
             return acc + (service?.plans[0].price || 0);
         }, 0);
@@ -235,12 +237,14 @@ export default function AddBundlePage() {
             {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-red-500" /> : <ChevronUp className="w-5 h-5 text-red-500" />}
           </button>
         </div>
-        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] p-4 transition-all duration-300 ease-in-out", isSummaryOpen ? "translate-y-0" : "translate-y-[calc(100%-80px)]")}>
-          <div className="flex justify-between items-center" onClick={() => setIsSummaryOpen(!isSummaryOpen)}>
-             <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
-             <span className="text-sm font-mono text-muted-foreground">{isValidBundle ? packName : ''}</span>
+        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-transform duration-300 ease-in-out", isSummaryOpen ? "translate-y-0" : "translate-y-[calc(100%-140px)]")}>
+          <div className="p-4">
+            <div className="flex justify-between items-center" onClick={() => setIsSummaryOpen(!isSummaryOpen)}>
+               <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
+               <span className="text-sm font-mono text-muted-foreground">{isValidBundle ? packName : ''}</span>
+            </div>
           </div>
-          <div className={cn("space-y-4 transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100 mt-4" : "max-h-0 opacity-0")}>
+          <div className={cn("px-4 pb-4 space-y-4 transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
             
             { isValidBundle && savings > 0 ? (
               <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold text-center">
@@ -258,17 +262,17 @@ export default function AddBundlePage() {
                 <ul className="space-y-1 text-sm">
                   {Array.from(selectedServices).map(id => {
                     const service = subscriptionServices.find(s => s.id === id);
-                    const offer = offerGroups.find(o => o.services.length === 1 && o.services[0] === id);
                     if (!service) return null;
+                    const individualPrice = service.plans[0].price;
                     return (
                       <li key={id} className="flex justify-between">
                         <span>• {serviceDisplayConfig[id as ServiceId].title}</span>
-                        <span>{offer?.sellingPrice.toFixed(0) || service.plans[0].price.toFixed(0)} บาท</span>
+                        <span>{individualPrice.toFixed(0)} บาท</span>
                       </li>
                     )
                   })}
                   { !isValidBundle && (
-                     <li className="flex justify-between text-muted-foreground">
+                     <li className="flex justify-between text-muted-foreground italic mt-2">
                         <span>+ เพิ่มบริการเพื่อรับส่วนลด (ไม่บังคับเลือก)</span>
                       </li>
                   )}
@@ -287,9 +291,14 @@ export default function AddBundlePage() {
                 )}
               </div>
             )}
-
-
-            <div className="border-t pt-4 space-y-3">
+             { !isValidBundle && selectedServices.size > 0 && (
+              <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded-lg flex items-center gap-3 text-sm mt-4">
+                <AlertCircle className="w-5 h-5" />
+                <span>This combination is not available as a bundle. Please adjust your selection.</span>
+              </div>
+            )}
+          </div>
+          <div className="px-4 pb-4 border-t pt-4 space-y-3">
               <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
                   <span className="text-red-600 font-bold text-xl">{total.toFixed(0)} บาท</span>
@@ -305,13 +314,6 @@ export default function AddBundlePage() {
                   ถัดไป
               </Button>
             </div>
-             { !isValidBundle && selectedServices.size > 0 && (
-              <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded-lg flex items-center gap-3 text-sm mt-4">
-                <AlertCircle className="w-5 h-5" />
-                <span>This combination is not available as a bundle. Please adjust your selection.</span>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -376,7 +378,3 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
     </div>
   )
 }
-
-    
-
-    
