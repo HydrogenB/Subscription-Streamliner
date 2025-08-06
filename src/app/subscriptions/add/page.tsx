@@ -155,11 +155,18 @@ export default function AddBundlePage() {
     const nextOffer = findBestOffer(potentialSelection);
   
     if (nextOffer) {
-      let currentTotal = total;
-      if (!isValidBundle && selectedServices.size > 0) {
-        currentTotal = fullPrice;
-      }
+      let currentTotal;
 
+      const currentOffer = findBestOffer(selectedServices);
+      if (currentOffer) {
+        currentTotal = currentOffer.sellingPrice;
+      } else {
+        currentTotal = Array.from(selectedServices).reduce((acc, id) => {
+            const service = subscriptionServices.find(s => s.id === id);
+            return acc + (service?.plans[0].price || 0);
+        }, 0);
+      }
+      
       const increment = nextOffer.sellingPrice - currentTotal;
       const standaloneOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
       const standalonePrice = standaloneOffer?.sellingPrice || service.plans[0].price;
@@ -299,7 +306,7 @@ export default function AddBundlePage() {
               </Button>
             </div>
              { !isValidBundle && selectedServices.size > 0 && (
-              <div className="bg-destructive/10 border-l-4 border-destructive text-destructive-foreground p-3 rounded-lg flex items-center gap-3 text-sm mt-4">
+              <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded-lg flex items-center gap-3 text-sm mt-4">
                 <AlertCircle className="w-5 h-5" />
                 <span>This combination is not available as a bundle. Please adjust your selection.</span>
               </div>
@@ -369,5 +376,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
     </div>
   )
 }
+
+    
 
     
