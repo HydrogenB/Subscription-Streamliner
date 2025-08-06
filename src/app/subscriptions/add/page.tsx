@@ -41,31 +41,21 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
 
   const selectedArray = Array.from(selectedIds).sort();
   
-  const matchedOffers = offerGroups.filter(offer => {
-    if (offer.services.length !== selectedArray.length) {
-      return false;
-    }
-    const offerServicesSorted = [...offer.services].sort();
-    return JSON.stringify(offerServicesSorted) === JSON.stringify(selectedArray);
-  });
+  let bestOffer: OfferGroup | null = null;
 
-  if (matchedOffers.length > 0) {
-     return matchedOffers.reduce((best, current) =>
-        current.sellingPrice < best.sellingPrice ? current : best
-    );
-  }
-  
-  if (selectedIds.size === 1) {
-    const singleServiceId = selectedArray[0];
-    const singleOffer = offerGroups.find(o => 
-        o.packName === 'Pack0' && o.services.length === 1 && o.services[0] === singleServiceId
-    );
-    if (singleOffer) {
-        return singleOffer;
+  for (const offer of offerGroups) {
+    // Exact match
+    if (offer.services.length === selectedArray.length) {
+      const offerServicesSorted = [...offer.services].sort();
+      if (JSON.stringify(offerServicesSorted) === JSON.stringify(selectedArray)) {
+        if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice) {
+          bestOffer = offer;
+        }
+      }
     }
   }
 
-  return null;
+  return bestOffer;
 }
 
 function findNextBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
@@ -271,7 +261,7 @@ export default function AddBundlePage() {
                         <div className="p-3">
                             <p className="font-bold text-sm text-yellow-900 dark:text-yellow-200 mb-1">Special Offer!</p>
                             <p className="text-xs text-yellow-800 dark:text-yellow-300">
-                                Add {nextBestOffer.services.length - selectedServices.size} more service(s) for just <span className="font-bold">{nextBestOffer.sellingPrice - total} THB</span> to get a discount!
+                                Add {nextBestOffer.services.length - selectedServices.size} more service(s) to save more!
                             </p>
                             <div className="flex items-center gap-2 mt-2">
                                 {nextBestOffer.services.filter(s => !selectedServices.has(s as ServiceId)).map(s_id => {
@@ -340,22 +330,9 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
 
     const getPriceInfo = () => {
       const originalPrice = service.plans[0].price;
-  
-      // Standalone price view (nothing selected yet)
-      if (selectedServices.size === 0) {
-        const standaloneOffer = offerGroups.find(o => o.packName === 'Pack0' && o.services[0] === service.id);
-        if (standaloneOffer && standaloneOffer.sellingPrice < originalPrice) {
-          return (
-            <div className="text-right">
-              <p className="font-bold text-primary text-lg">{standaloneOffer.sellingPrice.toFixed(0)} THB</p>
-              <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
-            </div>
-          );
-        }
-        return <p className="font-bold text-primary text-lg">{originalPrice.toFixed(0)} THB</p>;
-      }
-  
-      // If the card is for an already selected service
+      const standaloneOffer = offerGroups.find(o => o.packName === 'Pack0' && o.services[0] === service.id);
+      const displayPrice = standaloneOffer ? standaloneOffer.sellingPrice : originalPrice;
+
       if (isSelected) {
         return (
           <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
@@ -363,44 +340,13 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
           </div>
         );
       }
-      
-      // --- This is the core logic for incremental price calculation ---
-  
-      // 1. Calculate the current total price for the selected items
-      const currentOffer = findBestOffer(selectedServices);
-      const currentTotal = currentOffer 
-        ? currentOffer.sellingPrice 
-        : Array.from(selectedServices).reduce((acc, id) => {
-            const s = subscriptionServices.find(s_ => s_.id === id);
-            return acc + (s?.plans[0].price || 0);
-        }, 0);
-  
-      // 2. Calculate the potential new total if this service is added
-      const tempSelection = new Set(selectedServices);
-      if (NETFLIX_PLANS.includes(service.id as ServiceId)) {
-        NETFLIX_PLANS.forEach(plan => tempSelection.delete(plan));
-      }
-      tempSelection.add(service.id as ServiceId);
-  
-      const nextOffer = findBestOffer(tempSelection);
-      const nextTotal = nextOffer
-        ? nextOffer.sellingPrice
-        : Array.from(tempSelection).reduce((acc, id) => {
-            const s = subscriptionServices.find(s_ => s_.id === id);
-            return acc + (s?.plans[0].price || 0);
-          }, 0);
-  
-      // 3. The incremental cost is the difference
-      const addedCost = nextTotal - currentTotal;
-  
-      const isDiscounted = nextOffer && (nextOffer.fullPrice > nextOffer.sellingPrice);
-  
+
       return (
         <div className="text-right">
-          <p className={cn("font-bold text-lg", isDiscounted ? "text-green-600" : "text-destructive")}>
-            +{addedCost.toFixed(0)} THB
-          </p>
-          <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
+          <p className="font-bold text-primary text-lg">{displayPrice.toFixed(0)} THB</p>
+          {displayPrice < originalPrice && (
+            <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
+          )}
         </div>
       );
     };
