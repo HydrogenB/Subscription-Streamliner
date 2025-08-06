@@ -83,13 +83,11 @@ export default function AddBundlePage() {
       if (newSelection.has(serviceId)) {
         newSelection.delete(serviceId);
       } else {
-        // Enforce maximum selection limit
         if (newSelection.size >= MAX_SELECTION_LIMIT) {
-          return prev; // Do not modify if limit is reached
+          return prev;
         }
 
         newSelection.add(serviceId);
-        // If the added service is a Netflix plan, remove other Netflix plans
         if (NETFLIX_PLANS.includes(serviceId)) {
           for (const plan of NETFLIX_PLANS) {
             if (plan !== serviceId) {
@@ -110,17 +108,14 @@ export default function AddBundlePage() {
       return { total: matchedOffer.sellingPrice, savings, packName: matchedOffer.id, isValidBundle: true };
     }
     
-    // For single selections that have a standalone offer
     if (selectedServices.size === 1) {
       const singleServiceId = Array.from(selectedServices)[0];
-      const service = subscriptionServices.find(s => s.id === singleServiceId);
-       const singleOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === singleServiceId);
-      if (service && singleOffer) {
+      const singleOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === singleServiceId);
+      if (singleOffer) {
          return { total: singleOffer.sellingPrice, savings: 0, packName: singleOffer.id, isValidBundle: true };
       }
     }
     
-    // If no valid bundle, but items are selected
     if (selectedServices.size > 0) {
         return { total: 0, savings: 0, packName: "Invalid Bundle Combination", isValidBundle: false };
     }
@@ -143,25 +138,25 @@ export default function AddBundlePage() {
       return { text: `${singleOffer?.sellingPrice || service.plans[0].price} THB`, isIncremental: false };
     }
   
-    if (!isValidBundle && selectedServices.size >= MAX_SELECTION_LIMIT) {
+    if (selectedServices.size >= MAX_SELECTION_LIMIT) {
         return { text: '', isIncremental: false };
     }
 
     const potentialSelection = new Set(selectedServices);
-    potentialSelection.add(serviceId);
-  
-    // Conflict handling for Netflix
-    const selectedNetflix = NETFLIX_PLANS.find(p => selectedServices.has(p));
-    if (selectedNetflix && NETFLIX_PLANS.includes(serviceId) && selectedNetflix !== serviceId) {
-      potentialSelection.delete(selectedNetflix);
+    
+    if (NETFLIX_PLANS.includes(serviceId)) {
+      const selectedNetflix = NETFLIX_PLANS.find(p => potentialSelection.has(p));
+      if (selectedNetflix) {
+        potentialSelection.delete(selectedNetflix);
+      }
     }
+    potentialSelection.add(serviceId);
   
     const nextOffer = findBestOffer(potentialSelection);
   
     if (nextOffer) {
       let currentTotal = total;
-      // Handle the case where the current selection is a single item, which doesn't form a bundle yet.
-      if (selectedServices.size === 1) {
+      if (selectedServices.size === 1 && isValidBundle) {
         const singleServiceId = Array.from(selectedServices)[0];
         const singleOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === singleServiceId);
         if(singleOffer) {
@@ -202,7 +197,7 @@ export default function AddBundlePage() {
     <div className="flex flex-col h-screen bg-gray-50">
       <Header showBackButton title="Add bundle" />
       <div className="p-4 space-y-4 flex-grow overflow-y-auto pb-48">
-        <h2 className="text-xl font-bold">{packName}</h2>
+        
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700">
           <GiftIcon className="w-5 h-5 text-indigo-500" />
           <span>Select your favorite services to see bundle deals!</span>
@@ -240,6 +235,7 @@ export default function AddBundlePage() {
         <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] p-4 transition-all duration-300 ease-in-out", isSummaryOpen ? "translate-y-0" : "translate-y-[calc(100%-80px)]")}>
           <div className="flex justify-between items-center">
              <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
+             <span className="text-sm font-mono text-muted-foreground">{packName}</span>
           </div>
           <div className={cn("space-y-4 transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100 mt-2" : "max-h-0 opacity-0")}>
             { !isValidBundle && selectedServices.size > 0 ? (
@@ -290,7 +286,7 @@ interface ServiceCardProps {
 }
 
 function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, isConflicting, isDisabled }: ServiceCardProps) {
-  const finalIsDisabled = isDisabled || isConflicting;
+  const finalIsDisabled = isDisabled && !isSelected;
   
   return (
     <div
