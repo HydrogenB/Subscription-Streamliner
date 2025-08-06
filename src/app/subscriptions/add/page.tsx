@@ -6,12 +6,11 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { subscriptionServices, offerGroups } from '@/lib/data';
-import type { SubscriptionService, OfferGroup } from '@/lib/types';
+import type { SubscriptionService, OfferGroup, ServiceId } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Globe, Tv, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Tv, AlertCircle, ChevronUp, Gift, Home, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { GiftIcon } from '@/components/icons/gift-icon';
 import { NetflixIcon } from '@/components/icons/netflix-icon';
 import { YouTubeIcon } from '@/components/icons/youtube-icon';
 import { ViuIcon } from '@/components/icons/viu-icon';
@@ -20,20 +19,6 @@ import { WeTVIcon } from '@/components/icons/wetv-icon';
 import { OneDIcon } from '@/components/icons/oned-icon';
 import { TrueIDIcon } from '@/components/icons/trueid-icon';
 import { Card } from '@/components/ui/card';
-
-type ServiceId = 
-  | 'youtube' 
-  | 'viu' 
-  | 'netflix-mobile' 
-  | 'iqiyi'
-  | 'wetv'
-  | 'oned'
-  | 'trueplus'
-  | 'trueidshort'
-  | 'netflix-basic'
-  | 'netflix-standard'
-  | 'netflix-premium';
-
 
 const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: string }> = {
   youtube: { Icon: YouTubeIcon, title: 'Youtube Premium' },
@@ -165,17 +150,14 @@ export default function AddBundlePage() {
     const service = subscriptionServices.find(s => s.id === serviceId);
     if (!service) return { text: '', type: 'none' };
 
-    // If item is already selected, don't show a price.
     if (selectedServices.has(serviceId)) {
       return { text: '', type: 'none' };
     }
   
-    // If we're at the selection limit, don't show a price for unselected items.
     if (selectedServices.size >= MAX_SELECTION_LIMIT) {
       return { text: '', type: 'none' };
     }
 
-    // Handle Netflix plan switching
     const selectedNetflixPlan = Array.from(selectedServices).find(id => NETFLIX_PLANS.includes(id));
     if (NETFLIX_PLANS.includes(serviceId) && selectedNetflixPlan) {
         const currentNetflixService = subscriptionServices.find(s => s.id === selectedNetflixPlan);
@@ -190,7 +172,6 @@ export default function AddBundlePage() {
         };
     }
     
-    // If we have items selected, calculate the price to ADD this service
     if (selectedServices.size > 0) {
       const potentialSelection = new Set(selectedServices);
       potentialSelection.add(serviceId);
@@ -199,20 +180,19 @@ export default function AddBundlePage() {
       
       if (nextOffer) {
           const increment = nextOffer.sellingPrice - currentTotal;
-          return { text: `+${increment.toFixed(0)} THB`, type: 'default' };
+          return { text: `+${increment.toFixed(0)} THB`, type: 'bundle' };
       } else {
           const standalonePrice = service.plans[0].price;
           return { text: `+${standalonePrice.toFixed(0)} THB`, type: 'default' };
       }
     }
   
-    // This is the initial state (no services selected). Show promo or default price.
     const standalonePrice = service.plans[0].price;
-    const singleOffer = offerGroups.find(o => o.packName === 'Pack0' && o.services.length === 1 && o.services[0] === serviceId);
+    const singleOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
     
     if (singleOffer && singleOffer.sellingPrice < standalonePrice) {
       return {
-        text: `Claim for ${singleOffer.sellingPrice.toFixed(0)} THB`,
+        text: `${singleOffer.sellingPrice.toFixed(0)} THB`,
         originalPrice: `${standalonePrice.toFixed(0)} THB`,
         type: 'promo',
       };
@@ -244,8 +224,8 @@ export default function AddBundlePage() {
       <main className="flex-grow overflow-y-auto pb-48">
         <div className="p-4 space-y-4">
           
-          <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
-            <GiftIcon className="w-5 h-5 text-indigo-500" />
+          <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-lg flex items-center gap-3 text-sm text-blue-800 dark:text-blue-200">
+            <Gift className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             <span>Select your favorite services to see bundle deals!</span>
           </div>
 
@@ -275,7 +255,6 @@ export default function AddBundlePage() {
           onClick={() => setIsSummaryOpen(prev => !prev)}
           className={cn("bg-white dark:bg-gray-800 rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out cursor-pointer", isSummaryOpen && "pb-safe-bottom")}
         >
-          {/* Always visible footer summary */}
           <div className="px-4 py-3 flex justify-between items-center w-full">
               <div className="flex items-center gap-2">
                    <h3 className="font-semibold text-base text-gray-800 dark:text-gray-200">
@@ -287,15 +266,14 @@ export default function AddBundlePage() {
                   {savings > 0 && (
                      <span className="text-sm font-semibold text-green-600">Save {savings.toFixed(0)} THB</span>
                   )}
-                  <span className="font-bold text-lg text-red-500">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : `0 THB`}</span>
+                  <span className="font-bold text-lg text-primary">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : `0 THB`}</span>
               </div>
           </div>
           
-          {/* Collapsible detailed summary */}
           <div className={cn("overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
              <div className="px-4 pb-4 space-y-4">
                 
-                {selectedServices.size > 0 && (
+                {selectedServices.size > 0 ? (
                   <div className="space-y-4 pt-2">
                     <div>
                       <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">Your Services</h4>
@@ -332,6 +310,10 @@ export default function AddBundlePage() {
                       </div>
                     )}
                   </div>
+                ) : (
+                  <div className="text-center py-4 text-muted-foreground">
+                    Please select at least one service.
+                  </div>
                 )}
                 
                 {nextBestOffer && (
@@ -357,8 +339,8 @@ export default function AddBundlePage() {
                 {!isValidBundle && selectedServices.size > 0 && !nextBestOffer && (
                   <Card className="mt-4 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800">
                     <div className="p-3 flex items-center gap-3">
-                      <AlertCircle className="w-5 h-5 text-red-600" />
-                      <p className="text-sm text-red-800 dark:text-red-200">No bundle available for this combination.</p>
+                      <AlertCircle className="w-5 h-5 text-destructive" />
+                      <p className="text-sm text-destructive">No bundle available for this combination.</p>
                     </div>
                   </Card>
                 )}
@@ -366,7 +348,7 @@ export default function AddBundlePage() {
 
                 <div className="flex justify-between items-end pt-4 border-t mt-2 dark:border-gray-700">
                     <span className="text-base font-semibold text-gray-800 dark:text-gray-200">Total (excl. VAT)</span>
-                    <span className="font-bold text-2xl text-red-500">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : '0 THB'}</span>
+                    <span className="font-bold text-2xl text-primary">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : '0 THB'}</span>
                 </div>
             </div>
 
@@ -374,16 +356,16 @@ export default function AddBundlePage() {
                 <div className="space-y-3">
                     <div className="flex items-center gap-2">
                         {[1, 2, 3, 4].map(step => (
-                            <div key={step} className={cn("h-1.5 rounded-full flex-1", selectedServices.size >= step ? 'bg-red-500' : 'bg-gray-200 dark:bg-gray-600')}></div>
+                            <div key={step} className={cn("h-1.5 rounded-full flex-1", selectedServices.size >= step ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-600')}></div>
                         ))}
                     </div>
                      <Button 
                         size="lg" 
-                        className="w-full bg-red-500 hover:bg-red-600 rounded-full h-12 text-lg font-bold text-white" 
+                        className="w-full bg-primary hover:bg-primary/90 rounded-full h-12 text-lg font-bold text-white" 
                         disabled={selectedServices.size === 0}
                         onClick={handleNext}
                      >
-                        {selectedServices.size > 0 ? "Next" : "Please select at least one service"}
+                        {selectedServices.size > 0 ? "Next" : "Choose your bundle"}
                     </Button>
                 </div>
             </div>
@@ -413,7 +395,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
       onClick={!finalIsDisabled ? onToggle : undefined}
       className={cn(
         'p-4 rounded-xl border-2 bg-white dark:bg-gray-800 transition-all',
-        isSelected ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700',
+        isSelected ? 'border-primary bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700',
         finalIsDisabled ? 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600 cursor-not-allowed opacity-60' : 'cursor-pointer'
       )}
     >
@@ -424,7 +406,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
               disabled={finalIsDisabled}
               className={cn(
                 "w-5 h-5 mt-0.5 rounded border-2", 
-                isSelected ? "data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500" : "border-gray-400 dark:border-gray-500",
+                isSelected ? "data-[state=checked]:bg-primary data-[state=checked]:border-primary" : "border-gray-400 dark:border-gray-500",
                 "text-white"
               )} 
             />
@@ -454,7 +436,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
                 {priceInfo.originalPrice && <p className="text-sm text-muted-foreground line-through">{priceInfo.originalPrice}</p>}
                 <p className={cn(
                   "font-bold text-lg whitespace-nowrap",
-                  priceInfo.type === 'promo' ? 'text-red-500' : 
+                  priceInfo.type === 'promo' ? 'text-primary' : 
                   priceInfo.text.startsWith('+') ? 'text-green-600' : 'text-gray-800 dark:text-gray-300'
                 )}>
                   {priceInfo.text}
@@ -467,7 +449,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
         <div className="pl-12 mt-3 space-y-1 text-gray-600 dark:text-gray-400 text-sm">
             {service.plans[0].features.map((feature, index) => (
                 <div key={index} className="flex items-center gap-2">
-                    {feature.toLowerCase().includes('screen') || feature.toLowerCase().includes('480p') || feature.toLowerCase().includes('720p') || feature.toLowerCase().includes('1080p') || feature.toLowerCase().includes('4k') ? <Tv className="w-4 h-4"/> : <Globe className="w-4 h-4"/>}
+                    <Tv className="w-4 h-4"/>
                     <span>{feature}</span>
                 </div>
             ))}
@@ -476,5 +458,3 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
     </div>
   )
 }
-
-    

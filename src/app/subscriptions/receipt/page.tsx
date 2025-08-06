@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { Suspense } from 'react';
@@ -28,7 +29,7 @@ function ReceiptSkeleton() {
                 <Skeleton className="h-8 w-64" />
                 <Skeleton className="h-6 w-80" />
             </div>
-            <Skeleton className="h-64 w-full" />
+            <Skeleton className="h-64 w-full rounded-lg" />
             <div className="flex flex-col space-y-2">
                 <Skeleton className="h-12 w-full rounded-full" />
                 <Skeleton className="h-12 w-full rounded-full" />
@@ -36,5 +37,3 @@ function ReceiptSkeleton() {
         </div>
     )
 }
-
-    

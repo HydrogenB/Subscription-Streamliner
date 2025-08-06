@@ -4,25 +4,11 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { subscriptionServices, offerGroups } from '@/lib/data';
-import type { OfferGroup } from '@/lib/types';
+import type { OfferGroup, ServiceId } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle2, Home, FileText } from 'lucide-react';
-
-type ServiceId = 
-  | 'youtube' 
-  | 'viu' 
-  | 'netflix-mobile' 
-  | 'iqiyi'
-  | 'wetv'
-  | 'oned'
-  | 'trueplus'
-  | 'trueidshort'
-  | 'netflix-basic'
-  | 'netflix-standard'
-  | 'netflix-premium';
-
 
 const serviceDisplayConfig: Record<ServiceId, { title: string }> = {
   youtube: { title: 'Youtube Premium' },
@@ -82,13 +68,15 @@ export function ReceiptContent() {
   
   if (!orderId || serviceIds.length === 0) {
     return (
-      <Card className="text-center">
+      <Card className="text-center shadow-lg">
         <CardHeader>
           <CardTitle>Invalid Receipt</CardTitle>
           <CardDescription>This receipt is invalid or has expired. Please start a new purchase.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Button onClick={() => router.push('/')}>Go Home</Button>
+          <Button onClick={() => router.push('/')} className="rounded-full">
+            <Home className="mr-2" /> Go Home
+          </Button>
         </CardContent>
       </Card>
     );
@@ -102,7 +90,7 @@ export function ReceiptContent() {
             <p className="text-muted-foreground">Your new subscriptions are now active.</p>
         </div>
 
-      <Card>
+      <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Receipt</CardTitle>
           <CardDescription>
@@ -114,7 +102,7 @@ export function ReceiptContent() {
             <h3 className="font-semibold mb-2">Purchased Services</h3>
             <ul className="space-y-2 text-sm text-muted-foreground">
                 {serviceIds.map(id => (
-                    <li key={id}>• {serviceDisplayConfig[id].title}</li>
+                    <li key={id} className="font-medium text-gray-700 dark:text-gray-300">• {serviceDisplayConfig[id].title}</li>
                 ))}
             </ul>
           </div>
@@ -129,17 +117,15 @@ export function ReceiptContent() {
       </Card>
       
         <div className="flex flex-col space-y-2">
-            <Button size="lg" onClick={() => router.push('/account')}>
-                <FileText />
+            <Button size="lg" onClick={() => router.push('/account')} className="rounded-full font-bold">
+                <FileText className="mr-2"/>
                 View My Subscriptions
             </Button>
-            <Button size="lg" variant="outline" onClick={() => router.push('/')}>
-                <Home />
+            <Button size="lg" variant="outline" onClick={() => router.push('/')} className="rounded-full font-bold">
+                <Home className="mr-2"/>
                 Back to Home
             </Button>
         </div>
     </div>
   );
 }
-
-    

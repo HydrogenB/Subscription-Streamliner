@@ -4,25 +4,11 @@
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { subscriptionServices, offerGroups } from '@/lib/data';
-import type { OfferGroup } from '@/lib/types';
+import type { OfferGroup, ServiceId } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { AlertCircle, CreditCard } from 'lucide-react';
-
-type ServiceId = 
-  | 'youtube' 
-  | 'viu' 
-  | 'netflix-mobile' 
-  | 'iqiyi'
-  | 'wetv'
-  | 'oned'
-  | 'trueplus'
-  | 'trueidshort'
-  | 'netflix-basic'
-  | 'netflix-standard'
-  | 'netflix-premium';
-
 
 const serviceDisplayConfig: Record<ServiceId, { title: string }> = {
   youtube: { title: 'Youtube Premium' },
@@ -116,7 +102,7 @@ export function ConfirmationContent() {
 
   return (
     <div className="space-y-6">
-      <Card>
+      <Card className="shadow-lg">
         <CardHeader>
           <CardTitle>Order Summary</CardTitle>
           <CardDescription>Please review your bundle before confirming.</CardDescription>
@@ -130,8 +116,8 @@ export function ConfirmationContent() {
               
               return (
                 <li key={id} className="flex justify-between items-center text-sm">
-                  <span>{serviceDisplayConfig[id].title}</span>
-                  <span className={cn(savings > 0 && 'text-muted-foreground line-through')}>{originalPrice.toFixed(2)} THB</span>
+                  <span className="font-medium text-gray-800 dark:text-gray-200">{serviceDisplayConfig[id].title}</span>
+                  <span className={savings > 0 ? 'text-muted-foreground line-through' : 'text-gray-600 dark:text-gray-400'}>{originalPrice.toFixed(2)} THB</span>
                 </li>
               );
             })}
@@ -147,7 +133,7 @@ export function ConfirmationContent() {
             {savings > 0 && (
               <div className="flex justify-between text-green-600">
                 <span className="font-medium">Bundle Discount</span>
-                <span>-{savings.toFixed(2)} THB</span>
+                <span className="font-medium">-{savings.toFixed(2)} THB</span>
               </div>
             )}
             <div className="flex justify-between">
@@ -173,7 +159,7 @@ export function ConfirmationContent() {
         </CardContent>
       </Card>
       
-      <Card>
+      <Card className="shadow-lg">
           <CardHeader>
             <CardTitle>Payment Method</CardTitle>
             <CardDescription>A default payment method will be used.</CardDescription>
@@ -181,17 +167,15 @@ export function ConfirmationContent() {
           <CardContent className="flex items-center gap-4">
             <CreditCard className="h-8 w-8 text-primary" />
             <div>
-              <p className="font-semibold">Default Credit Card</p>
+              <p className="font-semibold text-gray-800 dark:text-gray-200">Default Credit Card</p>
               <p className="text-sm text-muted-foreground">Ending in **** 1234</p>
             </div>
           </CardContent>
       </Card>
 
-      <Button size="lg" className="w-full h-12 text-lg" onClick={handleConfirm}>
+      <Button size="lg" className="w-full h-12 text-lg rounded-full font-bold" onClick={handleConfirm}>
         Confirm & Pay
       </Button>
     </div>
   );
 }
-
-    

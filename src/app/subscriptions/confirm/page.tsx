@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { Suspense } from 'react';
@@ -22,11 +23,9 @@ export default function ConfirmationPage() {
 function ConfirmationSkeleton() {
     return (
         <div className="space-y-6">
-            <Skeleton className="h-48 w-full" />
-            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-48 w-full rounded-lg" />
+            <Skeleton className="h-24 w-full rounded-lg" />
             <Skeleton className="h-12 w-full rounded-full" />
         </div>
     )
 }
-
-    

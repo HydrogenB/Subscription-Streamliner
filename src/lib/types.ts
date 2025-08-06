@@ -23,3 +23,16 @@ export interface OfferGroup {
     sellingPrice: number;
     promotion?: string;
 }
+
+export type ServiceId = 
+  | 'youtube' 
+  | 'viu' 
+  | 'netflix-mobile' 
+  | 'iqiyi'
+  | 'wetv'
+  | 'oned'
+  | 'trueplus'
+  | 'trueidshort'
+  | 'netflix-basic'
+  | 'netflix-standard'
+  | 'netflix-premium';
