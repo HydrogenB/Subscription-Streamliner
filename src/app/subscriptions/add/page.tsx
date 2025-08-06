@@ -53,7 +53,7 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
   }
 
   const selectedArray = Array.from(selectedIds).sort();
-
+  
   const matchedOffers = offerGroups.filter(offer => {
     if (offer.services.length !== selectedArray.length) {
       return false;
@@ -260,16 +260,19 @@ export default function AddBundlePage() {
           <div className="px-4 py-3 flex justify-between items-center w-full">
               <div className="flex items-center gap-2">
                    <h3 className="font-semibold text-base text-gray-800">
-                     {isSummaryOpen ? 'สรุปค่าบริการรายเดือน' : 'Your Monthly Bill'}
+                     {selectedServices.size > 0 ? 'Your Monthly Bill' : 'Choose your bundle'}
                    </h3>
               </div>
               <div className="flex items-center gap-3">
-                  <span className="text-red-600 font-bold text-lg">{total.toFixed(0)} บาท</span>
+                  {selectedServices.size > 0 ? (
+                    <span className="text-red-600 font-bold text-lg">{total.toFixed(0)} บาท</span>
+                  ) : <span className="text-lg font-semibold text-gray-400">ยังไม่ได้เลือกบริการ</span>}
+
                   {!isSummaryOpen && (
                     <Button 
                         size="lg" 
                         className="bg-red-600 hover:bg-red-700 rounded-full h-10 text-base font-bold px-5" 
-                        disabled={!isValidBundle && !nextBestOffer}
+                        disabled={selectedServices.size === 0}
                         onClick={(e) => { e.stopPropagation(); /* Handle navigation */ }}
                     >
                         ถัดไป
@@ -301,7 +304,7 @@ export default function AddBundlePage() {
                                 <div className="w-5 flex justify-center">•</div>
                                 <span>{serviceDisplayConfig[id as ServiceId].title}</span>
                               </div>
-                              <span className="text-muted-foreground line-through">{individualPrice.toFixed(0)} บาท</span>
+                              <span className={cn(savings > 0 && "text-muted-foreground line-through")}>{individualPrice.toFixed(0)} บาท</span>
                             </li>
                           );
                         })}
@@ -372,7 +375,7 @@ export default function AddBundlePage() {
                          <Button 
                             size="lg" 
                             className="w-full bg-red-600 hover:bg-red-700 rounded-full h-12 text-lg font-bold" 
-                            disabled={!isValidBundle && !nextBestOffer}
+                            disabled={selectedServices.size === 0}
                          >
                             ถัดไป
                         </Button>
@@ -434,7 +437,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
         </div>
 
         <div className="text-right flex-shrink-0">
-            {priceInfo.originalPrice && priceInfo.type !== 'bundle' && (
+            {priceInfo.originalPrice && priceInfo.type === 'promo' && (
               <p className="text-sm text-muted-foreground line-through">{priceInfo.originalPrice}</p>
             )}
             <p className={cn(
@@ -449,8 +452,8 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
             )}
         </div>
       </div>
-       {isSelected && service.plans[0].features.length > 0 && (
-        <div className="pl-8 mt-3 space-y-1 text-gray-600 text-sm">
+       {(isSelected || service.plans[0].features.length > 0) && (
+        <div className="pl-12 mt-3 space-y-1 text-gray-600 text-sm">
             {service.plans[0].features.map((feature, index) => (
                 <div key={index} className="flex items-center gap-2">
                     {feature.toLowerCase().includes('screen') || feature.toLowerCase().includes('480p') || feature.toLowerCase().includes('720p') || feature.toLowerCase().includes('1080p') || feature.toLowerCase().includes('4k') ? <Tv className="w-4 h-4"/> : <Globe className="w-4 h-4"/>}
