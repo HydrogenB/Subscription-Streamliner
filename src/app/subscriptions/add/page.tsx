@@ -98,15 +98,16 @@ export default function AddBundlePage() {
 
     if (matchedOffer) {
       const savings = matchedOffer.fullPrice - matchedOffer.sellingPrice;
-      return { total: matchedOffer.sellingPrice, savings, packName: matchedOffer.packName, isValidBundle: true };
+      return { total: matchedOffer.sellingPrice, savings, packName: matchedOffer.id, isValidBundle: true };
     }
     
     // For single selections that have a standalone offer
     if (selectedServices.size === 1) {
       const singleServiceId = Array.from(selectedServices)[0];
       const service = subscriptionServices.find(s => s.id === singleServiceId);
-      if (service) {
-         return { total: service.plans[0].price, savings: 0, packName: service.name, isValidBundle: true };
+       const singleOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === singleServiceId);
+      if (service && singleOffer) {
+         return { total: singleOffer.sellingPrice, savings: 0, packName: singleOffer.id, isValidBundle: true };
       }
     }
     
@@ -129,7 +130,8 @@ export default function AddBundlePage() {
     }
     
     if (selectedServices.size === 0) {
-        return { text: `${service.plans[0].price} THB`, isIncremental: false };
+        const singleOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
+        return { text: `${singleOffer?.sellingPrice || service.plans[0].price} THB`, isIncremental: false };
     }
 
     if (!isValidBundle) {
@@ -259,7 +261,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
           )}
         </div>
         <div className="text-right">
-            <p className={cn("font-bold text-lg", priceInfo.isIncremental && 'text-green-600')}>{priceInfo.text}</p>
+            <p className={cn("font-bold text-lg whitespace-nowrap", priceInfo.isIncremental && 'text-green-600')}>{priceInfo.text}</p>
         </div>
       </div>
     </div>
