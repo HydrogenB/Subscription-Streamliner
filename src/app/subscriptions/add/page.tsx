@@ -127,52 +127,51 @@ export default function AddBundlePage() {
 
   const allServices = subscriptionServices;
 
-  const getPriceInfo = (serviceId: ServiceId): { text: string; originalPrice?: string; isIncremental: boolean } => {
+    const getPriceInfo = (serviceId: ServiceId): { text: string; originalPrice?: string; isIncremental: boolean } => {
     const service = subscriptionServices.find(s => s.id === serviceId);
     if (!service) return { text: '', isIncremental: false };
-  
+
     const standaloneOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
     const standalonePrice = standaloneOffer?.sellingPrice || service.plans[0].price;
-  
+
     if (selectedServices.has(serviceId)) {
       return { text: '', isIncremental: false };
     }
-  
+
     if (selectedServices.size === 0) {
       return { text: `${standalonePrice.toFixed(0)} THB`, isIncremental: false };
     }
-  
+
     if (selectedServices.size >= MAX_SELECTION_LIMIT) {
       return { text: '', isIncremental: false };
     }
-  
+
+    // Check if current selection is a valid bundle
+    const currentOffer = findBestOffer(selectedServices);
+    if (!currentOffer) {
+      // If not a valid bundle, just show the standalone price of the new service
+      return { text: `${standalonePrice.toFixed(0)} THB`, isIncremental: false };
+    }
+
     const potentialSelection = new Set(selectedServices);
     if (NETFLIX_PLANS.includes(serviceId)) {
-      // Create a temporary selection without any existing netflix plan to test adding the new one
       const tempSelection = new Set(selectedServices);
       NETFLIX_PLANS.forEach(plan => tempSelection.delete(plan));
       potentialSelection.clear();
       tempSelection.forEach(item => potentialSelection.add(item));
     }
     potentialSelection.add(serviceId);
-  
+
     const nextOffer = findBestOffer(potentialSelection);
-  
-    // Calculate current total price
-    const currentOffer = findBestOffer(selectedServices);
-    const currentTotal = currentOffer ? currentOffer.sellingPrice : Array.from(selectedServices).reduce((acc, id) => {
-      const s = subscriptionServices.find(s => s.id === id);
-      return acc + (s?.plans[0].price || 0);
-    }, 0);
-  
+    const currentTotal = currentOffer.sellingPrice;
+
     if (nextOffer) {
       const increment = nextOffer.sellingPrice - currentTotal;
-  
       const priceInfo: { text: string; originalPrice?: string; isIncremental: boolean } = {
         text: `+${Math.abs(increment).toFixed(0)} THB`,
         isIncremental: true,
       };
-  
+
       if (increment < standalonePrice) {
         priceInfo.originalPrice = `${standalonePrice.toFixed(0)} THB`;
       }
@@ -248,15 +247,9 @@ export default function AddBundlePage() {
 
           <div className={cn("px-4 space-y-4 overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100 pt-4" : "max-h-0 opacity-0 pt-0")}>
             
-            { savings > 0 ? (
-              <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold text-center">
-                ส่วนลดสูงสุด {savings.toFixed(0)} บาท เมื่อเลือกสูงสุด {selectedServices.size} แอป
-              </div>
-            ) : (
-              <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold text-center">
-                ส่วนลดสูงสุด {maxSavings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป
-              </div>
-            )}
+            <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold text-center">
+              ส่วนลดสูงสุด {maxSavings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป
+            </div>
             
             {selectedServices.size > 0 && (
               <div className="space-y-3 pt-2">
