@@ -89,7 +89,7 @@ export const offerGroups: OfferGroup[] = [
   { id: 'offerGroup60', packName: 'Pack2', services: ['oned', 'trueplus', 'netflix-mobile'], fullPrice: 317, sellingPrice: 229 },
   { id: 'offerGroup61', packName: 'Pack2', services: ['oned', 'trueplus', 'netflix-basic'], fullPrice: 387, sellingPrice: 229 },
   { id: 'offerGroup62', packName: 'Pack2', services: ['oned', 'trueplus', 'youtube'], fullPrice: 397, sellingPrice: 229 },
-  
+
   // 4-Service Bundles (Pack3)
   { id: 'offerGroup63', packName: 'Pack3', services: ['viu', 'wetv', 'netflix-mobile', 'youtube'], fullPrice: 556, sellingPrice: 339 },
   { id: 'offerGroup64', packName: 'Pack3', services: ['viu', 'wetv', 'netflix-basic', 'youtube'], fullPrice: 626, sellingPrice: 339 },
@@ -153,7 +153,7 @@ export const offerGroups: OfferGroup[] = [
   { id: 'offerGroup120', packName: 'Pack4', services: ['iqiyi', 'oned', 'trueplus', 'netflix-premium'], fullPrice: 756, sellingPrice: 499 },
   { id: 'offerGroup121', packName: 'Pack4', services: ['iqiyi', 'oned', 'trueplus', 'youtube'], fullPrice: 516, sellingPrice: 499 },
   { id: 'offerGroup122', packName: 'Pack4', services: ['iqiyi', 'oned', 'trueplus', 'trueidshort'], fullPrice: 686, sellingPrice: 499 },
-  
+
   // 3-Service Bundles (Pack5)
   { id: 'offerGroup123', packName: 'Pack5', services: ['viu', 'netflix-premium', 'youtube'], fullPrice: 747, sellingPrice: 559 },
   { id: 'offerGroup124', packName: 'Pack5', services: ['viu', 'netflix-premium', 'trueidshort'], fullPrice: 917, sellingPrice: 559 },
