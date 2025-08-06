@@ -24,15 +24,15 @@ const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: 
 };
 
 export default function AddBundlePage() {
-  const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set(['youtube']));
+  const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set(['youtube', 'viu']));
 
   const handleServiceToggle = (serviceId: ServiceId) => {
     setSelectedServices(prev => {
       const newSelection = new Set(prev);
+      if (serviceId === 'youtube') return prev; // Youtube premium is mandatory
+
       if (newSelection.has(serviceId)) {
-        if (newSelection.size > 1) { // Prevent unselecting the last item
-            newSelection.delete(serviceId);
-        }
+        newSelection.delete(serviceId);
       } else {
         newSelection.add(serviceId);
       }
@@ -40,43 +40,22 @@ export default function AddBundlePage() {
     });
   };
 
-  const { bestOffer, total, savings } = useMemo(() => {
-    let bestOffer: OfferGroup | null = null;
-    let maxMatched = 0;
-
-    for (const offer of offerGroups) {
-      const offerServices = new Set(offer.services);
-      const matchedServices = new Set([...selectedServices].filter(s => offerServices.has(s)));
-      
-      if (matchedServices.size === selectedServices.size && offerServices.size >= selectedServices.size) {
-        if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice) {
-          bestOffer = offer;
-          maxMatched = matchedServices.size;
-        }
-      }
-    }
-    
-    // Fallback to find any matching offer if no perfect one is found
-    if (!bestOffer) {
-        for (const offer of offerGroups) {
-            const offerServices = new Set(offer.services);
-            const matchedServices = new Set([...selectedServices].filter(s => offerServices.has(s)));
-            if (matchedServices.size > maxMatched) {
-                bestOffer = offer;
-                maxMatched = matchedServices.size;
-            }
-        }
-    }
-
+  const { total, savings } = useMemo(() => {
     const individualTotal = Array.from(selectedServices).reduce((acc, s) => {
-      const service = subscriptionServices.find(sub => sub.id === s);
-      return acc + (service?.plans[0]?.price || 0);
+        const service = subscriptionServices.find(sub => sub.id === s);
+        return acc + (service?.plans[0]?.price || 0);
     }, 0);
 
-    const total = bestOffer ? bestOffer.sellingPrice : individualTotal;
-    const savings = bestOffer ? individualTotal - total : 0;
+    let calculatedTotal = 0;
+    if (selectedServices.has('youtube')) {
+        calculatedTotal += 179;
+    }
+    const addons = Array.from(selectedServices).filter(s => s !== 'youtube');
+    calculatedTotal += addons.length * 90;
+
+    const savings = individualTotal - calculatedTotal;
     
-    return { bestOffer, total, savings };
+    return { total: calculatedTotal, savings };
   }, [selectedServices]);
 
   const youtubeService = subscriptionServices.find(s => s.id === 'youtube')!;
@@ -87,15 +66,8 @@ export default function AddBundlePage() {
   const getPriceInfo = (serviceId: ServiceId) => {
     if (serviceId === 'youtube') return { price: 179, originalPrice: null };
     
-    const baseYoutubePrice = 179;
-    const fourAppsOffer = offerGroups.find(o => o.id === 'offerGroup78'); // Viu, WeTV, Netflix Mobile, YouTube Premium (proxy for 4 apps)
-    
-    if (fourAppsOffer && selectedServices.size >=2) {
-      const pricePerAddon = (339 - baseYoutubePrice) / 3;
-      return { price: Math.round(pricePerAddon), originalPrice: 119 };
-    }
-    
-    return { price: 90, originalPrice: 119 };
+    const service = subscriptionServices.find(sub => sub.id === serviceId);
+    return { price: 90, originalPrice: service?.plans[0]?.price || null };
   };
 
   return (
@@ -114,9 +86,10 @@ export default function AddBundlePage() {
             service={youtubeService}
             Icon={serviceDisplayConfig.youtube.Icon}
             title={serviceDisplayConfig.youtube.title}
-            isSelected={selectedServices.has('youtube')}
-            onToggle={() => handleServiceToggle('youtube')}
+            isSelected={true}
+            onToggle={() => {}}
             price={getPriceInfo('youtube').price}
+            isBaseService={true}
           />
 
           {/* Other Services */}
@@ -156,39 +129,43 @@ interface ServiceCardProps {
   onToggle: () => void;
   price: number;
   originalPrice?: number | null;
+  isBaseService?: boolean;
 }
 
-function ServiceCard({ service, Icon, title, isSelected, onToggle, price, originalPrice }: ServiceCardProps) {
+function ServiceCard({ service, Icon, title, isSelected, onToggle, price, originalPrice, isBaseService = false }: ServiceCardProps) {
   return (
     <div
       onClick={onToggle}
       className={cn(
-        'p-4 rounded-xl border-2 bg-white transition-all cursor-pointer',
-        isSelected ? 'border-red-500 bg-red-50' : 'border-transparent'
+        'p-4 rounded-xl border-2 bg-white transition-all',
+        isSelected ? 'border-red-500 bg-red-50' : 'border-gray-200',
+        isBaseService ? '' : 'cursor-pointer'
       )}
     >
-      <div className="flex items-center gap-3">
-        <Checkbox checked={isSelected} className="w-5 h-5" />
-        <Icon className="w-8 h-8" />
-        <span className="font-bold flex-grow">{title}</span>
+      <div className="flex items-start gap-3">
+        <Checkbox checked={isSelected} disabled={isBaseService} className={cn("w-5 h-5 mt-1", isSelected && "data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500")} />
+        <Icon className={cn("w-8 h-8", service.id === 'netflix-mobile' && 'w-6 h-10')} />
+        <div className="flex-grow">
+          <span className="font-bold">{title}</span>
+          {isSelected && (
+            <div className="mt-3 space-y-1 text-gray-600">
+                <div className="flex items-center gap-2">
+                    <Globe className="w-4 h-4"/> <span>480 GB (SD resolution)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Tv className="w-4 h-4"/> <span>1 screen mobile/tablet only</span>
+                </div>
+                 <div className="flex items-center gap-2">
+                    <Download className="w-4 h-4"/> <span>1 download device</span>
+                </div>
+            </div>
+          )}
+        </div>
         <div className="text-right">
-            <p className="font-bold text-red-600">{isSelected && !originalPrice ? '' : '+'}{price} THB</p>
+            <p className="font-bold text-red-600 text-lg">{isBaseService ? '' : '+'}{price} THB</p>
             {originalPrice && <p className="text-sm text-muted-foreground line-through">{originalPrice} THB</p>}
         </div>
       </div>
-      {isSelected && service.id === 'youtube' && (
-        <div className="mt-3 pl-8 space-y-1 text-gray-600">
-            <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4"/> <span>480 GB (SD resolution)</span>
-            </div>
-            <div className="flex items-center gap-2">
-                <Tv className="w-4 h-4"/> <span>1 screen mobile/tablet only</span>
-            </div>
-             <div className="flex items-center gap-2">
-                <Download className="w-4 h-4"/> <span>1 download device</span>
-            </div>
-        </div>
-      )}
     </div>
   )
 }
