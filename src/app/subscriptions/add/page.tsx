@@ -179,21 +179,7 @@ export default function AddBundlePage() {
         const currentNetflixService = subscriptionServices.find(s => s.id === selectedNetflixPlan);
         if (!currentNetflixService) return {text: '', type: 'none'};
         
-        // This is a switch, not an addition. The price increment is what matters.
-        const potentialNewSelection = new Set(selectedServices);
-        potentialNewSelection.delete(selectedNetflixPlan);
-        potentialNewSelection.add(serviceId);
-        
-        const nextOffer = findBestOffer(potentialNewSelection);
-        const currentOffer = findBestOffer(selectedServices);
-        
-        let increment = 0;
-        if (nextOffer && currentOffer) {
-            increment = nextOffer.sellingPrice - currentOffer.sellingPrice;
-        } else {
-            // Fallback to price difference if not in a bundle
-            increment = service.plans[0].price - currentNetflixService.plans[0].price;
-        }
+        const increment = service.plans[0].price - currentNetflixService.plans[0].price;
 
         return {
             text: `+${increment.toFixed(0)} THB`,
@@ -207,10 +193,11 @@ export default function AddBundlePage() {
         const potentialSelection = new Set(selectedServices);
         potentialSelection.add(serviceId);
         const nextOffer = findBestOffer(potentialSelection);
+        const currentTotal = total;
         
         if (nextOffer) {
             // Price to add is the difference between the new bundle price and current total
-            const increment = nextOffer.sellingPrice - total;
+            const increment = nextOffer.sellingPrice - currentTotal;
             return { text: `+${increment.toFixed(0)} THB`, type: 'default' };
         } else {
             // If no bundle, just add the standalone price
@@ -225,7 +212,7 @@ export default function AddBundlePage() {
     
     if (singleOffer && singleOffer.sellingPrice < standalonePrice) {
       return {
-        text: `Claim for ${singleOffer.sellingPrice.toFixed(0)} THB`,
+        text: `${singleOffer.sellingPrice.toFixed(0)} THB`,
         originalPrice: `${standalonePrice.toFixed(0)} THB`,
         type: 'promo',
       };
@@ -291,6 +278,9 @@ export default function AddBundlePage() {
                    <ChevronUp className={cn("w-5 h-5 text-gray-500 transition-transform", !isSummaryOpen && "rotate-180")} />
               </div>
               <div className="flex items-center gap-3">
+                  {savings > 0 && (
+                     <span className="text-sm font-semibold text-green-600">Save {savings.toFixed(0)} THB</span>
+                  )}
                   <span className="font-bold text-lg text-red-500">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : `0 THB`}</span>
               </div>
           </div>
@@ -323,12 +313,12 @@ export default function AddBundlePage() {
                 
                     {savings > 0 && (
                        <div>
-                        <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">ส่วนลด</h4>
+                        <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">Discount</h4>
                         <ul className="space-y-1.5 text-sm">
                           <li className="flex justify-between items-center">
                             <div className="flex items-center gap-2">
                               <div className="w-5 flex justify-center"></div>
-                              <span className="text-gray-700 dark:text-gray-300">ส่วนลดสำหรับ {selectedServices.size} บริการ</span>
+                              <span className="text-gray-700 dark:text-gray-300">Bundle Discount for {selectedServices.size} services</span>
                             </div>
                             <span className="font-medium text-green-600">-{savings.toFixed(0)} THB</span>
                           </li>
@@ -479,3 +469,5 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
     </div>
   )
 }
+
+    
