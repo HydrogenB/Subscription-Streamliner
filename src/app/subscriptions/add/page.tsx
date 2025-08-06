@@ -121,39 +121,51 @@ export default function AddBundlePage() {
 
   const allServices = subscriptionServices;
 
-  const getPriceInfo = (serviceId: ServiceId) => {
+  const getPriceInfo = (serviceId: ServiceId): { text: string; originalPrice?: string; isIncremental: boolean } => {
     const service = subscriptionServices.find(s => s.id === serviceId);
     if (!service) return { text: '', isIncremental: false };
-
+  
     if (selectedServices.has(serviceId)) {
       return { text: '', isIncremental: false };
     }
-    
+  
     if (selectedServices.size === 0) {
-        const singleOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
-        return { text: `${singleOffer?.sellingPrice || service.plans[0].price} THB`, isIncremental: false };
+      const singleOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
+      return { text: `${singleOffer?.sellingPrice || service.plans[0].price} THB`, isIncremental: false };
     }
-
+  
     if (!isValidBundle) {
-        return { text: ``, isIncremental: false };
+      return { text: '', isIncremental: false };
     }
-
+  
     const potentialSelection = new Set(selectedServices);
     potentialSelection.add(serviceId);
-
+  
     // Conflict handling for Netflix
     const selectedNetflix = NETFLIX_PLANS.find(p => selectedServices.has(p));
     if (selectedNetflix && NETFLIX_PLANS.includes(serviceId) && selectedNetflix !== serviceId) {
-       potentialSelection.delete(selectedNetflix);
+      potentialSelection.delete(selectedNetflix);
     }
-
+  
     const nextOffer = findBestOffer(potentialSelection);
-    
+  
     if (nextOffer) {
-        const increment = nextOffer.sellingPrice - total;
-        return { text: `+${increment.toFixed(0)} THB`, isIncremental: true };
-    }
+      const increment = nextOffer.sellingPrice - total;
+      const standaloneOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
+      const standalonePrice = standaloneOffer?.sellingPrice || service.plans[0].price;
+      
+      const priceInfo: { text: string; originalPrice?: string; isIncremental: boolean } = {
+        text: `+${increment.toFixed(0)} THB`,
+        isIncremental: true,
+      };
 
+      if (increment < standalonePrice) {
+        priceInfo.originalPrice = `${standalonePrice.toFixed(0)} THB`;
+      }
+      
+      return priceInfo;
+    }
+  
     return { text: '', isIncremental: false };
   };
 
@@ -219,7 +231,7 @@ interface ServiceCardProps {
   title: string;
   isSelected: boolean;
   onToggle: () => void;
-  priceInfo: { text: string; isIncremental: boolean };
+  priceInfo: { text: string; originalPrice?: string; isIncremental: boolean };
   isConflicting: boolean;
 }
 
@@ -261,6 +273,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
           )}
         </div>
         <div className="text-right">
+            {priceInfo.originalPrice && <p className="text-sm text-muted-foreground line-through">{priceInfo.originalPrice}</p>}
             <p className={cn("font-bold text-lg whitespace-nowrap", priceInfo.isIncremental && 'text-green-600')}>{priceInfo.text}</p>
         </div>
       </div>
