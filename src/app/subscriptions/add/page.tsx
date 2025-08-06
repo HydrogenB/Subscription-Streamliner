@@ -242,14 +242,15 @@ export default function AddBundlePage() {
             {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-red-500" /> : <ChevronUp className="w-5 h-5 text-red-500" />}
           </button>
         </div>
-        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-transform duration-300 ease-in-out", isSummaryOpen ? "translate-y-0" : "translate-y-[calc(100%-140px)]")}>
-          <div className="p-4 cursor-pointer" onClick={() => setIsSummaryOpen(prev => !prev)}>
+        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-transform duration-300 ease-in-out", isSummaryOpen ? "translate-y-0" : "translate-y-[calc(100%-250px)]")}>
+          <div className="p-4 cursor-pointer border-b" onClick={() => setIsSummaryOpen(prev => !prev)}>
             <div className="flex justify-between items-center">
                <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
                <span className="text-sm font-mono text-muted-foreground">{isValidBundle ? packName : ''}</span>
             </div>
           </div>
-          <div className={cn("px-4 pb-4 space-y-4 overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
+
+          <div className={cn("px-4 pt-4 space-y-4 overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
             
             { savings > 0 ? (
               <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold text-center">
@@ -297,7 +298,8 @@ export default function AddBundlePage() {
               </div>
             )}
           </div>
-          <div className="px-4 pb-4 border-t pt-4 space-y-3">
+          
+          <div className="px-4 pb-4 pt-4 space-y-3 bg-white">
               { !isValidBundle && selectedServices.size > 0 && (
                 <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded-lg flex items-center gap-3 text-sm">
                   <AlertCircle className="w-5 h-5" />
