@@ -40,45 +40,20 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
   }
 
   const selectedArray = Array.from(selectedIds).sort();
-  
   let bestOffer: OfferGroup | null = null;
 
   for (const offer of offerGroups) {
-    // Exact match
-    if (offer.services.length === selectedArray.length) {
-      const offerServicesSorted = [...offer.services].sort();
-      if (JSON.stringify(offerServicesSorted) === JSON.stringify(selectedArray)) {
-        if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice) {
+    const offerServicesSorted = [...offer.services].sort();
+    
+    // Check for exact match
+    if (offerServicesSorted.length === selectedArray.length && JSON.stringify(offerServicesSorted) === JSON.stringify(selectedArray)) {
+       if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice) {
           bestOffer = offer;
         }
-      }
     }
   }
 
   return bestOffer;
-}
-
-function findNextBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
-    if (selectedIds.size === 0 || selectedIds.size >= MAX_SELECTION_LIMIT) {
-        return null;
-    }
-
-    const potentialOffers = offerGroups.filter(offer => {
-        if (offer.services.length <= selectedIds.size) return false;
-        if (offer.packName === 'Pack0') return false; 
-        const selectedIdArray = Array.from(selectedIds);
-        return selectedIdArray.every(id => offer.services.includes(id));
-    });
-
-    if (potentialOffers.length > 0) {
-        return potentialOffers.reduce((best, current) => {
-            const bestSavings = best.fullPrice - best.sellingPrice;
-            const currentSavings = current.fullPrice - current.sellingPrice;
-            return currentSavings > bestSavings ? current : best;
-        });
-    }
-
-    return null;
 }
 
 const NETFLIX_PLANS: ServiceId[] = ['netflix-mobile', 'netflix-basic', 'netflix-standard', 'netflix-premium'];
@@ -138,11 +113,6 @@ export default function AddBundlePage() {
 
     return { total: 0, savings: 0, packName: "Choose your bundle", isValidBundle: false, fullPrice: 0 };
   }, [selectedServices]);
-
-  const nextBestOffer = useMemo(() => {
-    if (isValidBundle) return null;
-    return findNextBestOffer(selectedServices);
-  }, [selectedServices, isValidBundle]);
   
   const handleNext = () => {
     if (selectedServices.size === 0) return;
@@ -156,17 +126,17 @@ export default function AddBundlePage() {
       <main className="flex-grow overflow-y-auto pb-48">
         <div className="p-4 space-y-6">
           
-          <div>
-            <h2 className="text-2xl font-bold text-center">Hero Bundle</h2>
-            <p className="text-muted-foreground text-center mb-4">Our most popular bundle with great savings.</p>
-            {heroBundle && (
+          {heroBundle && (
+            <div>
+              <h2 className="text-xl font-bold text-center">Hero Bundle</h2>
+              <p className="text-muted-foreground text-center mb-4">Our most popular bundle with great savings.</p>
               <OfferCard 
                 offer={heroBundle} 
                 allServices={allServices} 
                 onSelect={() => setSelectedServices(new Set(heroBundle.services as ServiceId[]))} 
               />
-            )}
-          </div>
+            </div>
+          )}
           
           <div>
             <h2 className="text-xl font-bold text-center mb-4">Or build your own bundle</h2>
@@ -180,6 +150,7 @@ export default function AddBundlePage() {
                   isSelected={selectedServices.has(service.id as ServiceId)}
                   onToggle={() => handleServiceToggle(service.id as ServiceId)}
                   selectedServices={selectedServices}
+                  currentTotal={total}
                 />
               ))}
             </div>
@@ -239,7 +210,7 @@ export default function AddBundlePage() {
                           <li className="flex justify-between items-center">
                             <div className="flex items-center gap-2">
                               <div className="w-5 flex justify-center"></div>
-                              <span className="text-gray-700 dark:text-gray-300">Bundle Discount for {selectedServices.size} services</span>
+                              <span className="text-gray-700 dark:text-gray-300">Bundle Discount</span>
                             </div>
                             <span className="font-medium text-green-600">-{savings.toFixed(0)} THB</span>
                           </li>
@@ -253,27 +224,7 @@ export default function AddBundlePage() {
                   </div>
                 )}
                 
-                {nextBestOffer && (
-                    <Card 
-                        className="mt-4 bg-yellow-50 dark:bg-yellow-900/40 border-yellow-400 cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/60"
-                        onClick={() => setSelectedServices(new Set(nextBestOffer.services as ServiceId[]))}
-                    >
-                        <div className="p-3">
-                            <p className="font-bold text-sm text-yellow-900 dark:text-yellow-200 mb-1">Special Offer!</p>
-                            <p className="text-xs text-yellow-800 dark:text-yellow-300">
-                                Add {nextBestOffer.services.length - selectedServices.size} more service(s) to save more!
-                            </p>
-                            <div className="flex items-center gap-2 mt-2">
-                                {nextBestOffer.services.filter(s => !selectedServices.has(s as ServiceId)).map(s_id => {
-                                    const s = serviceDisplayConfig[s_id as ServiceId];
-                                    return <s.Icon key={s_id} className="w-5 h-5" />;
-                                })}
-                            </div>
-                        </div>
-                    </Card>
-                )}
-
-                {!isValidBundle && selectedServices.size > 0 && !nextBestOffer && (
+                {!isValidBundle && selectedServices.size > 0 && (
                   <Card className="mt-4 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800">
                     <div className="p-3 flex items-center gap-3">
                       <AlertCircle className="w-5 h-5 text-destructive" />
@@ -320,35 +271,57 @@ interface ServiceCardProps {
   isSelected: boolean;
   onToggle: () => void;
   selectedServices: Set<ServiceId>;
+  currentTotal: number;
 }
 
-function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServices }: ServiceCardProps) {
+function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServices, currentTotal }: ServiceCardProps) {
     const isNetflixConflict = NETFLIX_PLANS.includes(service.id as ServiceId) && 
         NETFLIX_PLANS.some(plan => selectedServices.has(plan) && plan !== service.id);
 
     const isDisabled = (!isSelected && selectedServices.size >= MAX_SELECTION_LIMIT) || isNetflixConflict;
 
     const getPriceInfo = () => {
-      const originalPrice = service.plans[0].price;
-      const standaloneOffer = offerGroups.find(o => o.packName === 'Pack0' && o.services[0] === service.id);
-      const displayPrice = standaloneOffer ? standaloneOffer.sellingPrice : originalPrice;
+        const originalPrice = service.plans[0].price;
 
-      if (isSelected) {
+        // Find standalone promotional price (Pack0)
+        const standaloneOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === service.id);
+        const standalonePrice = standaloneOffer ? standaloneOffer.sellingPrice : originalPrice;
+
+        if (isSelected) {
+            return (
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                    <Check className="w-5 h-5 text-white" />
+                </div>
+            );
+        }
+        
+        // Calculate incremental cost
+        const potentialSelection = new Set(selectedServices);
+        potentialSelection.add(service.id as ServiceId);
+        
+        const bestOfferForPotential = findBestOffer(potentialSelection);
+        
+        let newTotal;
+        if (bestOfferForPotential) {
+            newTotal = bestOfferForPotential.sellingPrice;
+        } else {
+            // If no bundle, sum up standalone prices
+            newTotal = Array.from(potentialSelection).reduce((acc, id) => {
+                const s = subscriptionServices.find(s => s.id === id);
+                if (!s) return acc;
+                const offer = offerGroups.find(o => o.services.length === 1 && o.services[0] === id);
+                return acc + (offer ? offer.sellingPrice : s.plans[0].price);
+            }, 0);
+        }
+
+        const incrementalCost = newTotal - currentTotal;
+
         return (
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-            <Check className="w-5 h-5 text-white" />
-          </div>
+            <div className="text-right">
+                <p className="font-bold text-primary text-lg">+{incrementalCost.toFixed(0)} THB</p>
+                <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
+            </div>
         );
-      }
-
-      return (
-        <div className="text-right">
-          <p className="font-bold text-primary text-lg">{displayPrice.toFixed(0)} THB</p>
-          {displayPrice < originalPrice && (
-            <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
-          )}
-        </div>
-      );
     };
   
   return (
