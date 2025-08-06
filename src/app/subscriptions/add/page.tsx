@@ -159,7 +159,17 @@ export default function AddBundlePage() {
     const nextOffer = findBestOffer(potentialSelection);
   
     if (nextOffer) {
-      const increment = nextOffer.sellingPrice - total;
+      let currentTotal = total;
+      // Handle the case where the current selection is a single item, which doesn't form a bundle yet.
+      if (selectedServices.size === 1) {
+        const singleServiceId = Array.from(selectedServices)[0];
+        const singleOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === singleServiceId);
+        if(singleOffer) {
+            currentTotal = singleOffer.sellingPrice;
+        }
+      }
+
+      const increment = nextOffer.sellingPrice - currentTotal;
       const standaloneOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
       const standalonePrice = standaloneOffer?.sellingPrice || service.plans[0].price;
       
