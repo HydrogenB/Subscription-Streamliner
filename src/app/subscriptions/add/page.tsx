@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -41,27 +42,25 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
     const selectedArray = Array.from(selectedIds).sort();
     let bestOffer: OfferGroup | null = null;
   
+    // Exact match has highest priority
     for (const offer of offerGroups) {
       const offerServicesSorted = [...offer.services].sort();
-      
-      const isMatch = selectedArray.every(id => offerServicesSorted.includes(id));
-
-      if (isMatch && offerServicesSorted.length === selectedArray.length) {
-         if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice) {
-            bestOffer = offer;
-          }
+      if (offerServicesSorted.length === selectedArray.length && 
+          offerServicesSorted.every((id, index) => id === selectedArray[index])) {
+        if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice) {
+          bestOffer = offer;
+        }
       }
     }
 
     if(bestOffer) return bestOffer;
 
-    // find best offer for subsets
+    // Find best offer for subsets if no exact match
     for (const offer of offerGroups) {
         const offerServicesSorted = [...offer.services].sort();
-        
-        const isMatch = offerServicesSorted.every(id => selectedArray.includes(id));
+        const isSubset = offerServicesSorted.every(id => selectedArray.includes(id));
   
-        if (isMatch) {
+        if (isSubset) {
            if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice) {
               bestOffer = offer;
             }
@@ -89,7 +88,7 @@ export default function AddBundlePage() {
       if (newSelection.has(serviceId)) {
         newSelection.delete(serviceId);
       } else {
-        if (newSelection.size >= MAX_SELECTION_LIMIT) {
+        if (newSelection.size >= MAX_SELECTION_LIMIT && !NETFLIX_PLANS.some(p => newSelection.has(p) && NETFLIX_PLANS.includes(serviceId))) {
           alert(`You can select a maximum of ${MAX_SELECTION_LIMIT} services.`);
           return prev;
         }
@@ -288,15 +287,25 @@ interface ServiceCardProps {
 }
 
 function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServices }: ServiceCardProps) {
-    const isNetflixConflict = NETFLIX_PLANS.includes(service.id as ServiceId) && 
-        NETFLIX_PLANS.some(plan => selectedServices.has(plan) && plan !== service.id);
+    const isNetflixService = NETFLIX_PLANS.includes(service.id as ServiceId);
+    const selectedNetflixPlan = NETFLIX_PLANS.find(plan => selectedServices.has(plan));
+    const isNetflixConflict = isNetflixService && selectedNetflixPlan && selectedNetflixPlan !== service.id;
 
-    const isDisabled = (!isSelected && selectedServices.size >= MAX_SELECTION_LIMIT) || isNetflixConflict;
+    const isDisabled = (!isSelected && selectedServices.size >= MAX_SELECTION_LIMIT && !isNetflixConflict) ||
+                         (!isSelected && selectedServices.size >= MAX_SELECTION_LIMIT && isNetflixService && !selectedNetflixPlan);
+
 
     const getPriceInfo = useMemo(() => {
-        // Find standalone promotional price (Pack0)
-        const standaloneOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === service.id);
-        const standalonePrice = standaloneOffer ? standaloneOffer.sellingPrice : service.plans[0].price;
+        const calculateTotalPrice = (services: Set<ServiceId>): number => {
+            const bestOffer = findBestOffer(services);
+            if (bestOffer && bestOffer.services.length === services.size) {
+                return bestOffer.sellingPrice;
+            }
+            return Array.from(services).reduce((acc, id) => {
+                const s = subscriptionServices.find(s => s.id === id);
+                return acc + (s?.plans[0].price || 0);
+            }, 0);
+        };
 
         if (isSelected) {
             return (
@@ -305,48 +314,36 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
                 </div>
             );
         }
-        
-        // Calculate incremental cost
-        const currentTotal = (() => {
-            const matchedOffer = findBestOffer(selectedServices);
-            if (matchedOffer) {
-                return matchedOffer.sellingPrice;
-            }
-            return Array.from(selectedServices).reduce((acc, id) => {
-                const s = subscriptionServices.find(s => s.id === id);
-                const offer = offerGroups.find(o => o.services.length === 1 && o.services[0] === id);
-                return acc + (offer ? offer.sellingPrice : (s?.plans[0].price || 0));
-            }, 0);
-        })();
 
-        const potentialSelection = new Set(selectedServices);
-        if (NETFLIX_PLANS.includes(service.id as ServiceId)) {
-            NETFLIX_PLANS.forEach(plan => potentialSelection.delete(plan));
+        const currentTotal = calculateTotalPrice(selectedServices);
+        
+        let incrementalCost: number;
+        
+        if (isNetflixService && selectedNetflixPlan) {
+            const newSelection = new Set(selectedServices);
+            newSelection.delete(selectedNetflixPlan);
+            newSelection.add(service.id as ServiceId);
+            const newTotal = calculateTotalPrice(newSelection);
+            incrementalCost = newTotal - currentTotal;
+        } else {
+            const potentialSelection = new Set(selectedServices);
+            potentialSelection.add(service.id as ServiceId);
+            const newTotal = calculateTotalPrice(potentialSelection);
+            incrementalCost = newTotal - currentTotal;
         }
-        potentialSelection.add(service.id as ServiceId);
         
-        const bestOfferForPotential = findBestOffer(potentialSelection);
-        
-        const newTotal = (() => {
-            if (bestOfferForPotential && bestOfferForPotential.services.length === potentialSelection.size) {
-                return bestOfferForPotential.sellingPrice;
-            }
-            return Array.from(potentialSelection).reduce((acc, id) => {
-                const s = subscriptionServices.find(s => s.id === id);
-                const offer = offerGroups.find(o => o.services.length === 1 && o.services[0] === id);
-                return acc + (offer ? offer.sellingPrice : (s?.plans[0].price || 0));
-            }, 0);
-        })();
-
-        const incrementalCost = newTotal - currentTotal;
+        const sign = incrementalCost >= 0 ? '+' : '+-';
+        const displayCost = Math.abs(incrementalCost);
 
         return (
             <div className="text-right">
-                <p className="font-bold text-primary text-lg">+{incrementalCost.toFixed(0)} THB</p>
+                <p className={cn("font-bold text-lg", incrementalCost > 0 ? "text-primary" : "text-green-600")}>
+                  {sign}{displayCost.toFixed(0)} THB
+                </p>
                 <p className="text-xs text-muted-foreground line-through">{service.plans[0].price.toFixed(0)} THB</p>
             </div>
         );
-    }, [service.id, service.plans, selectedServices, isSelected]);
+    }, [service.id, service.plans, selectedServices, isSelected, selectedNetflixPlan, isNetflixService]);
   
   return (
     <div
@@ -362,7 +359,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
         </div>
 
         <Icon 
-          serviceId={service.id}
+          serviceid={service.id}
           className={cn("w-10 h-10 object-contain shrink-0", service.id.startsWith('netflix') && 'w-7 h-10')} 
         />
         <div className="flex-grow min-w-0">
@@ -376,5 +373,3 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
     </div>
   )
 }
-
-    
