@@ -112,7 +112,7 @@ const MAX_SELECTION_LIMIT = 4;
 const allServices = subscriptionServices;
 
 export default function AddBundlePage() {
-  const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set(['netflix-standard']));
+  const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set([]));
   const [isSummaryOpen, setIsSummaryOpen] = useState(true);
 
   const handleServiceToggle = (serviceId: ServiceId) => {
@@ -181,55 +181,26 @@ export default function AddBundlePage() {
     if (selectedServices.size >= MAX_SELECTION_LIMIT) {
       return { text: '', type: 'none' };
     }
-  
-    const standalonePrice = service.plans[0].price;
 
-    // If some items are selected, show the incremental price.
-    if(selectedServices.size > 0) {
-      const potentialSelection = new Set(selectedServices);
-      if (NETFLIX_PLANS.includes(serviceId)) {
-        NETFLIX_PLANS.forEach(p => potentialSelection.delete(p));
-      }
-      potentialSelection.add(serviceId);
+    const selectedNetflix = Array.from(selectedServices).find(id => NETFLIX_PLANS.includes(id as ServiceId));
+    if (NETFLIX_PLANS.includes(serviceId) && selectedNetflix) {
+        const currentService = subscriptionServices.find(s => s.id === selectedNetflix);
+        if (!currentService) return {text: '', type: 'none'};
 
-      const tempOffer = findBestOffer(potentialSelection);
-      if(tempOffer) {
-        const increment = tempOffer.sellingPrice - total;
-        return {
-          text: `+${increment.toFixed(0)} THB`,
-          type: 'bundle',
-        };
-      }
-
-      // If no bundle, calculate incremental from sum of individual prices
-      const currentTotal = Array.from(selectedServices).reduce((sum, id) => {
-        const s = allServices.find(serv => serv.id === id);
-        return sum + (s?.plans[0].price || 0);
-      }, 0);
-      
-      const nextTotal = Array.from(potentialSelection).reduce((sum, id) => {
-        const s = allServices.find(serv => serv.id === id);
-        return sum + (s?.plans[0].price || 0);
-      }, 0);
-
-      const increment = nextTotal - currentTotal;
-
-      const selectedNetflix = Array.from(selectedServices).find(id => NETFLIX_PLANS.includes(id as ServiceId));
-      if (NETFLIX_PLANS.includes(serviceId) && selectedNetflix) {
+        const increment = service.plans[0].price - currentService.plans[0].price;
         return {
             text: `+${increment.toFixed(0)} THB`,
-            originalPrice: `${standalonePrice.toFixed(0)} THB`,
+            originalPrice: `${service.plans[0].price.toFixed(0)} THB`,
             type: 'default',
         };
-      }
-      
-      return {
-          text: `+${standalonePrice.toFixed(0)} THB`,
-          type: 'default',
-        };
+    }
+
+    if (selectedServices.size > 0) {
+      const standalonePrice = service.plans[0].price;
+      return { text: `+${standalonePrice.toFixed(0)} THB`, type: 'default' };
     }
   
-    // If nothing is selected, show standalone promos or default prices.
+    const standalonePrice = service.plans[0].price;
     const singleOffer = findBestOffer(new Set([serviceId]));
     if (singleOffer && singleOffer.sellingPrice < standalonePrice) {
       return {
@@ -261,7 +232,7 @@ export default function AddBundlePage() {
       <main className="flex-grow overflow-y-auto pb-48">
         <div className="p-4 space-y-4">
           
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700">
+          <div className="bg-blue-50 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700">
             <GiftIcon className="w-5 h-5 text-indigo-500" />
             <span>Select your favorite services to see bundle deals!</span>
           </div>
@@ -301,7 +272,7 @@ export default function AddBundlePage() {
                    <ChevronUp className={cn("w-5 h-5 text-gray-500 transition-transform", !isSummaryOpen && "rotate-180")} />
               </div>
               <div className="flex items-center gap-3">
-                  <span className="text-red-600 font-bold text-lg">{total.toFixed(0)} บาท</span>
+                  <span className="text-red-600 font-bold text-lg">{selectedServices.size > 0 ? `${total.toFixed(0)} บาท` : `0 บาท`}</span>
               </div>
           </div>
           
@@ -380,7 +351,7 @@ export default function AddBundlePage() {
 
                 <div className="flex justify-between items-end pt-4 border-t mt-2">
                     <span className="text-base font-semibold text-gray-800">Total (excl. VAT)</span>
-                    <span className="text-red-600 font-bold text-2xl">{total.toFixed(0)} บาท</span>
+                    <span className="text-red-600 font-bold text-2xl">{selectedServices.size > 0 ? `${total.toFixed(0)} บาท` : '0 บาท'}</span>
                 </div>
             </div>
 
@@ -396,7 +367,7 @@ export default function AddBundlePage() {
                         className="w-full bg-red-600 hover:bg-red-700 rounded-full h-12 text-lg font-bold" 
                         disabled={selectedServices.size === 0}
                      >
-                        ถัดไป
+                        {selectedServices.size > 0 ? "ถัดไป" : "Please select at least one service"}
                     </Button>
                 </div>
             </div>
@@ -430,23 +401,23 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
         finalIsDisabled ? 'bg-gray-200 border-gray-300 cursor-not-allowed opacity-60' : 'cursor-pointer'
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 flex-1">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
             <Checkbox 
               checked={isSelected}
               disabled={finalIsDisabled}
               className={cn(
-                "w-5 h-5 mt-1 rounded", 
-                isSelected && "data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500",
-                (finalIsDisabled) && "data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-500"
+                "w-5 h-5 mt-0.5 rounded border-2", 
+                isSelected ? "data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500" : "border-red-500",
+                finalIsDisabled && "data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-500 border-gray-500"
               )} 
             />
             <Icon 
-              className={cn("w-10 h-10 object-contain", service.id.startsWith('netflix') && 'w-7 h-10')} 
+              className={cn("w-10 h-10 object-contain shrink-0", service.id.startsWith('netflix') && 'w-7 h-10')} 
               serviceId={service.id}
             />
-            <div className="flex-grow">
-              <span className={cn("font-bold", finalIsDisabled && "text-gray-500")}>{title}</span>
+            <div className="flex-grow min-w-0">
+              <span className={cn("font-bold text-base", finalIsDisabled && "text-gray-500")}>{title}</span>
               <div className="min-h-[1.25rem] mt-1 pr-2">
                  {isConflicting && <p className="text-xs text-destructive font-semibold">Only one Netflix plan allowed.</p>}
                  {isDisabled && !isSelected && !isConflicting && <p className="text-xs text-destructive font-semibold">Maximum of {MAX_SELECTION_LIMIT} services allowed.</p>}
@@ -455,16 +426,20 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
         </div>
 
         <div className="text-right flex-shrink-0">
-            {isConflicting && priceInfo.originalPrice && (
-              <p className="text-sm text-muted-foreground line-through">{priceInfo.originalPrice}</p>
+            {isConflicting && priceInfo.originalPrice ? (
+              <>
+                <p className="text-sm text-muted-foreground line-through">{priceInfo.originalPrice}</p>
+                <p className="font-bold text-lg text-green-600">+0 THB</p>
+              </>
+            ) : priceInfo.text && (
+              <p className={cn(
+                "font-bold text-lg whitespace-nowrap",
+                priceInfo.type === 'promo' && 'text-red-600',
+                priceInfo.text.startsWith('+') ? 'text-green-600' : 'text-red-600'
+              )}>
+                {priceInfo.text}
+              </p>
             )}
-            <p className={cn(
-              "font-bold text-lg whitespace-nowrap",
-              priceInfo.type === 'promo' && 'text-red-600',
-              (priceInfo.type === 'bundle' || (priceInfo.type === 'default' && priceInfo.text.startsWith('+'))) && 'text-green-600'
-            )}>
-              {priceInfo.text}
-            </p>
         </div>
       </div>
        {(isSelected || (isConflicting && !isDisabled)) && (
