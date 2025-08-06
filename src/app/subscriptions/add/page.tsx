@@ -72,6 +72,8 @@ function findBestOffer(selectedIds: Set<ServiceId>) {
 const NETFLIX_PLANS: ServiceId[] = ['netflix-mobile', 'netflix-basic', 'netflix-standard', 'netflix-premium'];
 const MAX_SELECTION_LIMIT = 4;
 
+const allServices = subscriptionServices;
+
 export default function AddBundlePage() {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set());
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
@@ -160,6 +162,9 @@ export default function AddBundlePage() {
     
     if (nextOffer) {
         const increment = nextOffer.sellingPrice - total;
+        if (increment < 0) {
+           return { text: `+${standalonePrice.toFixed(0)} THB`, isIncremental: true, originalPrice: `${standalonePrice.toFixed(0)} THB`};
+        }
         const priceInfo: { text: string; originalPrice?: string; isIncremental: boolean } = {
             text: `+${Math.max(0, increment).toFixed(0)} THB`,
             isIncremental: true,
@@ -170,21 +175,10 @@ export default function AddBundlePage() {
         }
         return priceInfo;
     } else {
-        // If it does not form a valid bundle, show the full price
-        if (selectedServices.size > 0 && !isValidBundle) {
-             return { text: `${standalonePrice.toFixed(0)} THB`, isIncremental: false };
+        if (!currentOffer) {
+            return { text: `+${standalonePrice.toFixed(0)} THB`, isIncremental: true };
         }
-        // If it's a valid bundle but this addition breaks it, show the full price.
-        const currentSelectedPrice = Array.from(selectedServices).reduce((acc, id) => acc + (subscriptionServices.find(s => s.id === id)?.plans[0].price ?? 0), 0)
-        if (isValidBundle && (currentSelectedPrice + standalonePrice) > (total + standalonePrice) ) {
-            const increment = total + standalonePrice - currentTotal;
-            if (increment > 0) {
-                return { text: `+${standalonePrice.toFixed(0)} THB`, isIncremental: false };
-            }
-        }
-
-        // Default to standalone price if no other logic fits
-        return { text: `+${standalonePrice.toFixed(0)} THB`, isIncremental: true };
+        return { text: `${standalonePrice.toFixed(0)} THB`, isIncremental: false };
     }
   };
 
@@ -233,17 +227,12 @@ export default function AddBundlePage() {
 
       <footer className="fixed bottom-0 left-0 right-0 z-10 max-w-md mx-auto">
         <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out", isSummaryOpen && "pb-safe-bottom")}>
-           <div className={cn("px-4 transition-all duration-300 ease-in-out", !isSummaryOpen && 'pt-4')}>
-
-            <div 
-              className={cn(
-                "flex justify-between items-center cursor-pointer",
-                !isSummaryOpen && "py-4 border-t"
-              )}
+           <div 
+              className={cn("px-4 cursor-pointer", !isSummaryOpen && 'py-4 border-t')}
               onClick={() => setIsSummaryOpen(prev => !prev)}
             >
               {!isSummaryOpen ? (
-                <>
+                <div className="flex justify-between items-center w-full">
                     <div className="flex items-center gap-2">
                          <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
                          <ChevronUp className="w-5 h-5 text-gray-500" />
@@ -260,15 +249,14 @@ export default function AddBundlePage() {
                             <ArrowRight className="ml-2 h-5 w-5" />
                         </Button>
                     </div>
-                </>
+                </div>
               ) : (
-                <div className="flex justify-between items-center w-full" >
+                <div className="flex justify-between items-center w-full pt-4" >
                     <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
                     <ChevronDown className="w-5 h-5 text-gray-500" />
                 </div>
               )}
             </div>
-          </div>
           
           <div className={cn("overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
              <div className="px-4 pb-4 space-y-4">
@@ -296,7 +284,7 @@ export default function AddBundlePage() {
                         </div>
 
                         {isValidBundle && savings > 0 && (
-                             <div>
+                            <div>
                                 <h4 className="font-bold text-gray-800 mb-2 text-base">ส่วนลด</h4>
                                 <ul className="space-y-1.5 text-sm">
                                 <li className="flex justify-between items-center">
