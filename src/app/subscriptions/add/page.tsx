@@ -187,17 +187,10 @@ export default function AddBundlePage() {
       <Header showBackButton title="Add bundle" />
       <div className="p-4 space-y-4 flex-grow overflow-y-auto pb-48">
         <h2 className="text-xl font-bold">{packName}</h2>
-        { !isValidBundle && selectedServices.size > 0 ? (
-          <div className="bg-destructive/10 border-l-4 border-destructive text-destructive p-3 rounded-lg flex items-center gap-3 text-sm">
-            <AlertCircle className="w-5 h-5" />
-            <span>This combination is not available as a bundle. Please adjust your selection.</span>
-          </div>
-        ) : (
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700">
-            <GiftIcon className="w-5 h-5 text-indigo-500" />
-            <span>Select your favorite services to see bundle deals!</span>
-          </div>
-        )}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700">
+          <GiftIcon className="w-5 h-5 text-indigo-500" />
+          <span>Select your favorite services to see bundle deals!</span>
+        </div>
 
         <div className="space-y-3">
           {allServices.map(service => (
@@ -229,12 +222,16 @@ export default function AddBundlePage() {
              <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
           </div>
           <div className={cn("space-y-4 transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100 mt-2" : "max-h-0 opacity-0")}>
-            {isValidBundle && savings > 0 && (
+            { !isValidBundle && selectedServices.size > 0 ? (
+              <div className="bg-destructive/10 border-l-4 border-destructive text-destructive-foreground p-3 rounded-lg flex items-center gap-3 text-sm">
+                <AlertCircle className="w-5 h-5" />
+                <span>This combination is not available as a bundle. Please adjust your selection.</span>
+              </div>
+            ) : isValidBundle && savings > 0 ? (
               <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold">
                 ส่วนลดสูงสุด {savings.toFixed(0)} บาท เมื่อเลือกสูงสุด {selectedServices.size} แอป
               </div>
-            )}
-             {(!isValidBundle || savings <= 0) && (
+            ) : (
               <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold">
                 ส่วนลดสูงสุด {maxSavings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป
               </div>
