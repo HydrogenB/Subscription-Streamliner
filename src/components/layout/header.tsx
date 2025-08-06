@@ -1,8 +1,8 @@
 "use client"
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Clapperboard, Menu, X } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { Clapperboard, Menu, X, ArrowLeft } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import React from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -13,26 +13,32 @@ const navLinks = [
   { href: "/account", label: "Account" },
 ];
 
-export function Header() {
+export function Header({ showBackButton = false, title }: { showBackButton?: boolean; title?: string }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center justify-between">
-        <div className="flex items-center">
+      <div className="container flex h-14 items-center justify-between px-4">
+        {showBackButton ? (
+          <Button variant="ghost" size="icon" onClick={() => router.back()} className="h-8 w-8">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+        ) : (
           <Link href="/" className="flex items-center space-x-2">
             <Clapperboard className="h-6 w-6 text-primary" />
-            <span className="font-bold font-headline">
-              Subscription Streamliner
-            </span>
           </Link>
+        )}
+        
+        <div className="flex-1 text-center">
+            <h1 className="text-lg font-bold">{title}</h1>
         </div>
         
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Menu className="h-6 w-6" />
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Menu className="h-5 w-5" />
               <span className="sr-only">Open menu</span>
             </Button>
           </SheetTrigger>
@@ -40,7 +46,7 @@ export function Header() {
               <div className="flex justify-between items-center mb-8">
                 <Link href="/" onClick={() => setIsOpen(false)} className="flex items-center space-x-2">
                   <Clapperboard className="h-6 w-6 text-primary" />
-                  <span className="font-bold font-headline">
+                  <span className="font-bold">
                     Subscription Streamliner
                   </span>
                 </Link>
@@ -71,7 +77,6 @@ export function Header() {
               </div>
           </SheetContent>
         </Sheet>
-
       </div>
     </header>
   );
