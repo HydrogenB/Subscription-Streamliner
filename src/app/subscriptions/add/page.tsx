@@ -172,7 +172,7 @@ export default function AddBundlePage() {
         }
         return priceInfo;
     } else {
-        return { text: `${standalonePrice.toFixed(0)} THB`, isIncremental: false };
+        return { text: `+${standalonePrice.toFixed(0)} THB`, isIncremental: false };
     }
   };
 
@@ -361,8 +361,10 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
             <Icon className={cn("w-8 h-8", service.id.startsWith('netflix') && 'w-6 h-10', service.id === 'youtube' && 'w-10 h-8')} />
             <div className="flex-grow">
               <span className={cn("font-bold", finalIsDisabled && "text-gray-500")}>{title}</span>
+              <div className="min-h-[1.25rem]">
               {isConflicting && <p className="text-xs text-destructive mt-1">Only one Netflix plan allowed.</p>}
               {isDisabled && !isSelected && !isConflicting && <p className="text-xs text-destructive mt-1">Maximum of {MAX_SELECTION_LIMIT} services allowed.</p>}
+              </div>
             </div>
         </div>
 
