@@ -6,7 +6,7 @@ import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { SubscriptionService } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Globe, Tv, Download } from 'lucide-react';
+import { Globe, Tv } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GiftIcon } from '@/components/icons/gift-icon';
 import { NetflixIcon } from '@/components/icons/netflix-icon';
@@ -45,6 +45,30 @@ const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: 
   'netflix-premium': { Icon: NetflixIcon, title: 'Netflix Premium' },
 };
 
+function findBestOffer(selectedIds: Set<ServiceId>) {
+    if (selectedIds.size === 0) {
+      return null;
+    }
+    const selectedArray = Array.from(selectedIds).sort();
+
+    // Find all matching offers
+    const matchedOffers = offerGroups.filter(offer => {
+      if (offer.services.length !== selectedArray.length) {
+        return false;
+      }
+      const offerServicesSorted = [...offer.services].sort();
+      return JSON.stringify(offerServicesSorted) === JSON.stringify(selectedArray);
+    });
+
+    // Return the one with the lowest selling price
+    if (matchedOffers.length > 0) {
+        return matchedOffers.reduce((best, current) => 
+            current.sellingPrice < best.sellingPrice ? current : best
+        , matchedOffers[0]);
+    }
+    return null;
+}
+
 export default function AddBundlePage() {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set());
 
@@ -60,35 +84,54 @@ export default function AddBundlePage() {
     });
   };
 
-  const { total, savings, packName } = useMemo(() => {
-    if (selectedServices.size === 0) {
-      return { total: 0, savings: 0, packName: "Choose your bundle" };
-    }
-    
-    const selectedArray = Array.from(selectedServices).sort();
-
-    const matchedOffer = offerGroups.find(offer => {
-      if (offer.services.length !== selectedArray.length) {
-        return false;
-      }
-      const offerServicesSorted = [...offer.services].sort();
-      return JSON.stringify(offerServicesSorted) === JSON.stringify(selectedArray);
-    });
+  const { total, savings, packName, currentOffer } = useMemo(() => {
+    const matchedOffer = findBestOffer(selectedServices);
 
     if (matchedOffer) {
       const savings = matchedOffer.fullPrice - matchedOffer.sellingPrice;
-      return { total: matchedOffer.sellingPrice, savings, packName: matchedOffer.packName };
+      return { total: matchedOffer.sellingPrice, savings, packName: matchedOffer.packName, currentOffer: matchedOffer };
     }
 
-    const individualTotal = Array.from(selectedServices).reduce((acc, s) => {
-      const service = subscriptionServices.find(sub => sub.id === s);
-      return acc + (service?.plans[0]?.price || 0);
-    }, 0);
+    if (selectedServices.size > 0) {
+        const individualTotal = Array.from(selectedServices).reduce((acc, s) => {
+            const service = subscriptionServices.find(sub => sub.id === s);
+            return acc + (service?.plans[0]?.price || 0);
+        }, 0);
+        return { total: individualTotal, savings: 0, packName: "Custom Bundle", currentOffer: null };
+    }
     
-    return { total: individualTotal, savings: 0, packName: "Custom Bundle" };
+    return { total: 0, savings: 0, packName: "Choose your bundle", currentOffer: null };
   }, [selectedServices]);
 
   const allServices = subscriptionServices;
+
+  const getPriceInfo = (serviceId: ServiceId) => {
+    const service = subscriptionServices.find(s => s.id === serviceId);
+    if (!service) return { text: '', isIncremental: false };
+
+    // If the service is selected, don't show price info
+    if (selectedServices.has(serviceId)) {
+      return { text: '', isIncremental: false };
+    }
+
+    // If nothing is selected yet, show the full price
+    if (selectedServices.size === 0) {
+        return { text: `${service.plans[0].price} THB`, isIncremental: false };
+    }
+
+    // Calculate potential next bundle
+    const potentialSelection = new Set(selectedServices);
+    potentialSelection.add(serviceId);
+    const nextOffer = findBestOffer(potentialSelection);
+    
+    if (nextOffer) {
+        const increment = nextOffer.sellingPrice - total;
+        return { text: `+${increment.toFixed(0)} THB`, isIncremental: true };
+    }
+
+    // Default to adding the service's individual price
+    return { text: `+${service.plans[0].price} THB`, isIncremental: true };
+  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -109,7 +152,7 @@ export default function AddBundlePage() {
               title={serviceDisplayConfig[service.id as ServiceId].title}
               isSelected={selectedServices.has(service.id as ServiceId)}
               onToggle={() => handleServiceToggle(service.id as ServiceId)}
-              price={service.plans[0].price}
+              priceInfo={getPriceInfo(service.id as ServiceId)}
             />
           ))}
         </div>
@@ -136,10 +179,10 @@ interface ServiceCardProps {
   title: string;
   isSelected: boolean;
   onToggle: () => void;
-  price: number;
+  priceInfo: { text: string; isIncremental: boolean };
 }
 
-function ServiceCard({ service, Icon, title, isSelected, onToggle, price }: ServiceCardProps) {
+function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo }: ServiceCardProps) {
   return (
     <div
       onClick={onToggle}
@@ -157,7 +200,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, price }: Serv
             <div className="mt-3 space-y-1 text-gray-600 text-sm">
                 {service.plans[0].features.map((feature, index) => (
                     <div key={index} className="flex items-center gap-2">
-                        {feature.toLowerCase().includes('screen') ? <Tv className="w-4 h-4"/> : <Globe className="w-4 h-4"/>}
+                        {feature.toLowerCase().includes('screen') || feature.toLowerCase().includes('480p') || feature.toLowerCase().includes('720p') || feature.toLowerCase().includes('1080p') || feature.toLowerCase().includes('4k') ? <Tv className="w-4 h-4"/> : <Globe className="w-4 h-4"/>}
                         <span>{feature}</span>
                     </div>
                 ))}
@@ -165,7 +208,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, price }: Serv
           )}
         </div>
         <div className="text-right">
-            <p className="font-bold text-lg">{price} THB</p>
+            <p className={cn("font-bold text-lg", priceInfo.isIncremental && 'text-green-600')}>{priceInfo.text}</p>
         </div>
       </div>
     </div>
