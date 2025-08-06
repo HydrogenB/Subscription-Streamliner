@@ -6,7 +6,7 @@ import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { SubscriptionService } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Globe, Tv, AlertCircle } from 'lucide-react';
+import { Globe, Tv, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GiftIcon } from '@/components/icons/gift-icon';
 import { NetflixIcon } from '@/components/icons/netflix-icon';
@@ -16,6 +16,8 @@ import { IQIYIIcon } from '@/components/icons/iqiyi-icon';
 import { WeTVIcon } from '@/components/icons/wetv-icon';
 import { OneDIcon } from '@/components/icons/oned-icon';
 import { TrueIDIcon } from '@/components/icons/trueid-icon';
+import { Progress } from '@/components/ui/progress';
+
 
 type ServiceId = 
   | 'youtube' 
@@ -71,6 +73,7 @@ const NETFLIX_PLANS: ServiceId[] = ['netflix-mobile', 'netflix-basic', 'netflix-
 
 export default function AddBundlePage() {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set());
+  const [isSummaryOpen, setIsSummaryOpen] = useState(true);
 
   const handleServiceToggle = (serviceId: ServiceId) => {
     setSelectedServices(prev => {
@@ -176,11 +179,13 @@ export default function AddBundlePage() {
     const selectedNetflixPlan = NETFLIX_PLANS.find(plan => selectedServices.has(plan));
     return !!selectedNetflixPlan && selectedNetflixPlan !== serviceId;
   }
+  
+  const maxSavings = Math.max(...offerGroups.filter(o => o.services.length === 4).map(o => o.fullPrice - o.sellingPrice));
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Header showBackButton title="Add bundle" />
-      <div className="p-4 space-y-4 flex-grow overflow-y-auto">
+      <div className="p-4 space-y-4 flex-grow overflow-y-auto pb-48">
         <h2 className="text-xl font-bold">{packName}</h2>
         { !isValidBundle && selectedServices.size > 0 ? (
           <div className="bg-destructive/10 border-l-4 border-destructive text-destructive-foreground p-3 rounded-lg flex items-center gap-3 text-sm">
@@ -209,18 +214,49 @@ export default function AddBundlePage() {
           ))}
         </div>
       </div>
-      <div className="p-4 border-t bg-white sticky bottom-0">
-        <div className="flex justify-between items-center mb-2">
-            <span className="text-muted-foreground">Total price</span>
-            <div>
-                {savings > 0 && isValidBundle && <span className="text-sm text-muted-foreground line-through mr-2">THB {(total + savings).toFixed(2)}</span>}
-                <span className="font-bold text-xl">THB {isValidBundle ? total.toFixed(2) : '0.00'}</span>
-            </div>
+
+      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-10">
+        <div className="relative">
+          <button 
+            onClick={() => setIsSummaryOpen(!isSummaryOpen)}
+            className="absolute -top-3 left-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center border"
+          >
+            {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-red-500" /> : <ChevronUp className="w-5 h-5 text-red-500" />}
+          </button>
         </div>
-        <Button size="lg" className="w-full" disabled={!isValidBundle || selectedServices.size === 0}>
-          Confirm bundle
-        </Button>
+        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] p-4 transition-all duration-300 ease-in-out", isSummaryOpen ? "translate-y-0" : "translate-y-[calc(100%-80px)]")}>
+          <div className="flex justify-between items-center">
+             <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
+          </div>
+          <div className={cn("space-y-4 transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100 mt-2" : "max-h-0 opacity-0")}>
+            {isValidBundle && savings > 0 && (
+              <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold">
+                ส่วนลดสูงสุด {savings.toFixed(0)} บาท เมื่อเลือกสูงสุด {selectedServices.size} แอป
+              </div>
+            )}
+             {(!isValidBundle || savings <= 0) && (
+              <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold">
+                ส่วนลดสูงสุด {maxSavings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป
+              </div>
+            )}
+            <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
+                <span className="text-red-600 font-bold text-xl">{isValidBundle ? total.toFixed(0) : '0'} บาท</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+                {[1,2,3,4].map(step => (
+                    <div key={step} className={cn("h-1.5 rounded-full", selectedServices.size >= step ? 'bg-red-500 flex-1' : 'bg-gray-200 flex-1')}></div>
+                ))}
+            </div>
+
+            <Button size="lg" className="w-full bg-red-600 hover:bg-red-700 rounded-full" disabled={!isValidBundle || selectedServices.size === 0}>
+                ถัดไป
+            </Button>
+          </div>
+        </div>
       </div>
+
     </div>
   );
 }
