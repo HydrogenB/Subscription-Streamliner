@@ -70,6 +70,7 @@ function findBestOffer(selectedIds: Set<ServiceId>) {
 }
 
 const NETFLIX_PLANS: ServiceId[] = ['netflix-mobile', 'netflix-basic', 'netflix-standard', 'netflix-premium'];
+const MAX_SELECTION_LIMIT = 4;
 
 export default function AddBundlePage() {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set());
@@ -82,6 +83,11 @@ export default function AddBundlePage() {
       if (newSelection.has(serviceId)) {
         newSelection.delete(serviceId);
       } else {
+        // Enforce maximum selection limit
+        if (newSelection.size >= MAX_SELECTION_LIMIT) {
+          return prev; // Do not modify if limit is reached
+        }
+
         newSelection.add(serviceId);
         // If the added service is a Netflix plan, remove other Netflix plans
         if (NETFLIX_PLANS.includes(serviceId)) {
@@ -137,10 +143,10 @@ export default function AddBundlePage() {
       return { text: `${singleOffer?.sellingPrice || service.plans[0].price} THB`, isIncremental: false };
     }
   
-    if (!isValidBundle) {
-      return { text: '', isIncremental: false };
+    if (!isValidBundle && selectedServices.size >= MAX_SELECTION_LIMIT) {
+        return { text: '', isIncremental: false };
     }
-  
+
     const potentialSelection = new Set(selectedServices);
     potentialSelection.add(serviceId);
   
@@ -203,6 +209,10 @@ export default function AddBundlePage() {
               onToggle={() => handleServiceToggle(service.id as ServiceId)}
               priceInfo={getPriceInfo(service.id as ServiceId)}
               isConflicting={isNetflixConflict(service.id as ServiceId)}
+              isDisabled={
+                  !selectedServices.has(service.id as ServiceId) &&
+                  selectedServices.size >= MAX_SELECTION_LIMIT
+              }
             />
           ))}
         </div>
@@ -266,34 +276,36 @@ interface ServiceCardProps {
   onToggle: () => void;
   priceInfo: { text: string; originalPrice?: string; isIncremental: boolean };
   isConflicting: boolean;
+  isDisabled: boolean;
 }
 
-function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, isConflicting }: ServiceCardProps) {
-  const isDisabled = isConflicting;
+function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, isConflicting, isDisabled }: ServiceCardProps) {
+  const finalIsDisabled = isDisabled || isConflicting;
   
   return (
     <div
-      onClick={!isDisabled ? onToggle : undefined}
+      onClick={!finalIsDisabled ? onToggle : undefined}
       className={cn(
         'p-4 rounded-xl border-2 bg-white transition-all',
         isSelected ? 'border-red-500 bg-red-50' : 'border-gray-200',
-        isDisabled ? 'bg-gray-200 border-gray-300 cursor-not-allowed opacity-60' : 'cursor-pointer'
+        finalIsDisabled ? 'bg-gray-200 border-gray-300 cursor-not-allowed opacity-60' : 'cursor-pointer'
       )}
     >
       <div className="flex items-start gap-3">
         <Checkbox 
           checked={isSelected}
-          disabled={isDisabled}
+          disabled={finalIsDisabled}
           className={cn(
             "w-5 h-5 mt-1", 
             isSelected && "data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500",
-            isDisabled && "data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-500"
+            finalIsDisabled && "data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-500"
           )} 
         />
         <Icon className={cn("w-8 h-8", service.id.startsWith('netflix') && 'w-6 h-10', service.id === 'youtube' && 'w-10 h-8')} />
         <div className="flex-grow">
-          <span className={cn("font-bold", isDisabled && "text-gray-500")}>{title}</span>
+          <span className={cn("font-bold", finalIsDisabled && "text-gray-500")}>{title}</span>
            {isConflicting && <p className="text-xs text-destructive mt-1">Only one Netflix plan allowed.</p>}
+           {isDisabled && !isSelected && <p className="text-xs text-destructive mt-1">Maximum of {MAX_SELECTION_LIMIT} services allowed.</p>}
           {isSelected && service.plans[0].features.length > 0 && (
             <div className="mt-3 space-y-1 text-gray-600 text-sm">
                 {service.plans[0].features.map((feature, index) => (
