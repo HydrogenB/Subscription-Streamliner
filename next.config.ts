@@ -28,6 +28,10 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'www.true.th',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.icon-icons.com',
+      },
     ],
   },
 };
