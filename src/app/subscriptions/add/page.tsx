@@ -74,7 +74,12 @@ const NETFLIX_PLANS: ServiceId[] = ['netflix-mobile', 'netflix-basic', 'netflix-
 const MAX_SELECTION_LIMIT = 4;
 
 const allServices = subscriptionServices;
-const heroBundle = offerGroups.find(o => o.id === 'offerGroup12');
+const heroBundles = [
+  offerGroups.find(o => o.id === 'offerGroup12'), // Viu + WeTV
+  offerGroups.find(o => o.id === 'offerGroup33'), // Viu + WeTV + Netflix Mobile
+  offerGroups.find(o => o.id === 'offerGroup63'), // Viu + WeTV + Netflix Mobile + YouTube
+].filter(Boolean) as OfferGroup[];
+
 
 export default function AddBundlePage() {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set([]));
@@ -140,20 +145,25 @@ export default function AddBundlePage() {
       <main className="flex-grow overflow-y-auto pb-48">
         <div className="p-4 space-y-6">
           
-          {heroBundle && (
+          {heroBundles.length > 0 && (
             <div>
-              <h2 className="text-xl font-bold text-center">Hero Bundle</h2>
-              <p className="text-muted-foreground text-center mb-4">Our most popular bundle with great savings.</p>
-              <OfferCard 
-                offer={heroBundle} 
-                allServices={allServices} 
-                onSelect={() => setSelectedServices(new Set(heroBundle.services as ServiceId[]))} 
-              />
+              <h2 className="text-xl font-bold text-center">Hero Bundles</h2>
+              <p className="text-muted-foreground text-center mb-4">Our most popular bundles with great savings.</p>
+              <div className="space-y-4">
+                {heroBundles.map(bundle => (
+                  <OfferCard 
+                    key={bundle.id}
+                    offer={bundle} 
+                    allServices={allServices} 
+                    onSelect={() => setSelectedServices(new Set(bundle.services as ServiceId[]))} 
+                  />
+                ))}
+              </div>
             </div>
           )}
           
           <div>
-            <h2 className="text-xl font-bold text-center mb-4">Or build your own bundle</h2>
+            <h2 className="text-xl font-bold text-center mb-4 mt-8">Or build your own bundle</h2>
             <div className="space-y-3">
               {allServices.map(service => (
                 <ServiceCard 
@@ -320,11 +330,23 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
         let incrementalCost: number;
         
         if (isNetflixService && selectedNetflixPlan) {
-            const newSelection = new Set(selectedServices);
-            newSelection.delete(selectedNetflixPlan);
-            newSelection.add(service.id as ServiceId);
-            const newTotal = calculateTotalPrice(newSelection);
-            incrementalCost = newTotal - currentTotal;
+            const tempSelection = new Set(selectedServices);
+            tempSelection.delete(selectedNetflixPlan);
+            tempSelection.add(service.id as ServiceId);
+            const newTotal = calculateTotalPrice(tempSelection);
+            const oldNetflixPrice = subscriptionServices.find(s => s.id === selectedNetflixPlan)?.plans[0].price || 0;
+            const currentTotalWithoutOldNetflix = calculateTotalPrice(new Set(Array.from(selectedServices).filter(id => id !== selectedNetflixPlan)));
+            const newNetflixPrice = service.plans[0].price;
+
+            const selectionWithoutAnyNetflix = new Set(selectedServices);
+            selectionWithoutAnyNetflix.delete(selectedNetflixPlan);
+            const priceWithoutAnyNetflix = calculateTotalPrice(selectionWithoutAnyNetflix);
+            
+            const potentialSelectionWithNewNetflix = new Set(selectionWithoutAnyNetflix);
+            potentialSelectionWithNewNetflix.add(service.id as ServiceId);
+            const priceWithNewNetflix = calculateTotalPrice(potentialSelectionWithNewNetflix);
+
+            incrementalCost = priceWithNewNetflix - priceWithoutAnyNetflix;
         } else {
             const potentialSelection = new Set(selectedServices);
             potentialSelection.add(service.id as ServiceId);
@@ -332,13 +354,13 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
             incrementalCost = newTotal - currentTotal;
         }
         
-        const sign = incrementalCost >= 0 ? '+' : '-';
+        const sign = incrementalCost < 0 ? '' : '+';
         const displayCost = Math.abs(incrementalCost);
 
         return (
             <div className="text-right">
-                <p className={cn("font-bold text-lg", incrementalCost > 0 ? "text-primary" : "text-green-600")}>
-                  {sign}{displayCost.toFixed(0)} THB
+                <p className={cn("font-bold text-lg", incrementalCost >= 0 ? "text-primary" : "text-green-600")}>
+                  {sign}{incrementalCost.toFixed(0)} THB
                 </p>
                 <p className="text-xs text-muted-foreground line-through">{service.plans[0].price.toFixed(0)} THB</p>
             </div>
