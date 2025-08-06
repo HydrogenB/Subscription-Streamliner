@@ -7,7 +7,7 @@ import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { SubscriptionService, OfferGroup } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Globe, Tv, AlertCircle, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
+import { Globe, Tv, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GiftIcon } from '@/components/icons/gift-icon';
 import { NetflixIcon } from '@/components/icons/netflix-icon';
@@ -61,21 +61,9 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
     const offerServicesSorted = [...offer.services].sort();
     return JSON.stringify(offerServicesSorted) === JSON.stringify(selectedArray);
   });
-
+  
   if (matchedOffers.length > 0) {
-    // If it's a single service and it's a Pack0 promo, return that.
-    if (selectedArray.length === 1 && matchedOffers.some(o => o.packName === 'Pack0')) {
-        const pack0Offer = matchedOffers.find(o => o.packName === 'Pack0');
-        if (pack0Offer) return pack0Offer;
-    }
-    // Otherwise, return the best offer that is NOT a Pack0 (which are standalone promos)
-    const nonPack0Offers = matchedOffers.filter(o => o.packName !== 'Pack0');
-    if (nonPack0Offers.length > 0) {
-        return nonPack0Offers.reduce((best, current) =>
-            current.sellingPrice < best.sellingPrice ? current : best
-        );
-    }
-    // Fallback to any matched offer if only Pack0 was found for a multi-selection (should not happen with current data)
+    // Return the best offer (lowest price)
     return matchedOffers.reduce((best, current) =>
         current.sellingPrice < best.sellingPrice ? current : best
     );
@@ -83,6 +71,7 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
   
   return null;
 }
+
 
 function findNextBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
     if (selectedIds.size === 0 || selectedIds.size >= MAX_SELECTION_LIMIT) {
@@ -173,48 +162,80 @@ export default function AddBundlePage() {
   const getPriceInfo = (serviceId: ServiceId): { text: string; originalPrice?: string; type: 'bundle' | 'promo' | 'default' | 'none' } => {
     const service = subscriptionServices.find(s => s.id === serviceId);
     if (!service) return { text: '', type: 'none' };
-  
+
+    // If item is already selected, don't show a price.
     if (selectedServices.has(serviceId)) {
       return { text: '', type: 'none' };
     }
   
+    // If we're at the selection limit, don't show a price for unselected items.
     if (selectedServices.size >= MAX_SELECTION_LIMIT) {
       return { text: '', type: 'none' };
     }
 
-    const selectedNetflix = Array.from(selectedServices).find(id => NETFLIX_PLANS.includes(id as ServiceId));
-    if (NETFLIX_PLANS.includes(serviceId) && selectedNetflix) {
-        const currentService = subscriptionServices.find(s => s.id === selectedNetflix);
-        if (!currentService) return {text: '', type: 'none'};
+    // Handle Netflix plan switching
+    const selectedNetflixPlan = Array.from(selectedServices).find(id => NETFLIX_PLANS.includes(id));
+    if (NETFLIX_PLANS.includes(serviceId) && selectedNetflixPlan) {
+        const currentNetflixService = subscriptionServices.find(s => s.id === selectedNetflixPlan);
+        if (!currentNetflixService) return {text: '', type: 'none'};
+        
+        // This is a switch, not an addition. The price increment is what matters.
+        const potentialNewSelection = new Set(selectedServices);
+        potentialNewSelection.delete(selectedNetflixPlan);
+        potentialNewSelection.add(serviceId);
+        
+        const nextOffer = findBestOffer(potentialNewSelection);
+        const currentOffer = findBestOffer(selectedServices);
+        
+        let increment = 0;
+        if (nextOffer && currentOffer) {
+            increment = nextOffer.sellingPrice - currentOffer.sellingPrice;
+        } else {
+            // Fallback to price difference if not in a bundle
+            increment = service.plans[0].price - currentNetflixService.plans[0].price;
+        }
 
-        const increment = service.plans[0].price - currentService.plans[0].price;
         return {
             text: `+${increment.toFixed(0)} THB`,
             originalPrice: `${service.plans[0].price.toFixed(0)} THB`,
             type: 'default',
         };
     }
-
+    
+    // If we have items selected, calculate the price to ADD this service
     if (selectedServices.size > 0) {
-      const standalonePrice = service.plans[0].price;
-      return { text: `+${standalonePrice.toFixed(0)} THB`, type: 'default' };
+        const potentialSelection = new Set(selectedServices);
+        potentialSelection.add(serviceId);
+        const nextOffer = findBestOffer(potentialSelection);
+        
+        if (nextOffer) {
+            // Price to add is the difference between the new bundle price and current total
+            const increment = nextOffer.sellingPrice - total;
+            return { text: `+${increment.toFixed(0)} THB`, type: 'default' };
+        } else {
+            // If no bundle, just add the standalone price
+            const standalonePrice = service.plans[0].price;
+            return { text: `+${standalonePrice.toFixed(0)} THB`, type: 'default' };
+        }
     }
   
+    // This is the initial state (no services selected). Show promo or default price.
     const standalonePrice = service.plans[0].price;
     const singleOffer = findBestOffer(new Set([serviceId]));
+    
     if (singleOffer && singleOffer.sellingPrice < standalonePrice) {
       return {
-        text: `${singleOffer.sellingPrice.toFixed(0)} THB`,
+        text: `Claim for ${singleOffer.sellingPrice.toFixed(0)} THB`,
         originalPrice: `${standalonePrice.toFixed(0)} THB`,
         type: 'promo',
       };
     }
+    
     return {
       text: `${standalonePrice.toFixed(0)} THB`,
       type: 'default',
     };
   };
-
 
   const isNetflixConflict = (serviceId: ServiceId): boolean => {
     if (!NETFLIX_PLANS.includes(serviceId)) {
@@ -224,15 +245,13 @@ export default function AddBundlePage() {
     return !!selectedNetflixPlan && selectedNetflixPlan !== serviceId;
   }
   
-  const maxSavings = Math.max(...offerGroups.filter(o => o.services.length === 4).map(o => o.fullPrice - o.sellingPrice));
-
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       <Header showBackButton title="Add bundle" />
       <main className="flex-grow overflow-y-auto pb-48">
         <div className="p-4 space-y-4">
           
-          <div className="bg-blue-50 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700">
+          <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700 dark:text-gray-300">
             <GiftIcon className="w-5 h-5 text-indigo-500" />
             <span>Select your favorite services to see bundle deals!</span>
           </div>
@@ -258,21 +277,21 @@ export default function AddBundlePage() {
         </div>
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 z-10 max-w-md mx-auto">
+      <footer className="fixed bottom-0 left-0 right-0 z-10 w-full max-w-md mx-auto">
         <div
           onClick={() => setIsSummaryOpen(prev => !prev)}
-          className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out cursor-pointer", isSummaryOpen && "pb-safe-bottom")}
+          className={cn("bg-white dark:bg-gray-800 rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out cursor-pointer", isSummaryOpen && "pb-safe-bottom")}
         >
           {/* Always visible footer summary */}
           <div className="px-4 py-3 flex justify-between items-center w-full">
               <div className="flex items-center gap-2">
-                   <h3 className="font-semibold text-base text-gray-800">
-                    สรุปค่าบริการรายเดือน
+                   <h3 className="font-semibold text-base text-gray-800 dark:text-gray-200">
+                    Your Monthly Bill
                    </h3>
                    <ChevronUp className={cn("w-5 h-5 text-gray-500 transition-transform", !isSummaryOpen && "rotate-180")} />
               </div>
               <div className="flex items-center gap-3">
-                  <span className="text-red-600 font-bold text-lg">{selectedServices.size > 0 ? `${total.toFixed(0)} บาท` : `0 บาท`}</span>
+                  <span className="font-bold text-lg text-red-500">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : `0 THB`}</span>
               </div>
           </div>
           
@@ -283,8 +302,8 @@ export default function AddBundlePage() {
                 {selectedServices.size > 0 && (
                   <div className="space-y-4 pt-2">
                     <div>
-                      <h4 className="font-bold text-gray-800 mb-2 text-base">Your Services</h4>
-                      <ul className="space-y-2 text-sm text-gray-700">
+                      <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">Your Services</h4>
+                      <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                         {Array.from(selectedServices).map(id => {
                           const service = subscriptionServices.find(s => s.id === id);
                           if (!service) return null;
@@ -295,7 +314,7 @@ export default function AddBundlePage() {
                                 <div className="w-5 flex justify-center">•</div>
                                 <span>{serviceDisplayConfig[id as ServiceId].title}</span>
                               </div>
-                              <span className={cn(savings > 0 && "text-muted-foreground line-through")}>{individualPrice.toFixed(0)} บาท</span>
+                              <span className={cn(savings > 0 && "text-muted-foreground line-through")}>{individualPrice.toFixed(0)} THB</span>
                             </li>
                           );
                         })}
@@ -304,14 +323,14 @@ export default function AddBundlePage() {
                 
                     {savings > 0 && (
                        <div>
-                        <h4 className="font-bold text-gray-800 mb-2 text-base">ส่วนลด</h4>
+                        <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">ส่วนลด</h4>
                         <ul className="space-y-1.5 text-sm">
                           <li className="flex justify-between items-center">
                             <div className="flex items-center gap-2">
                               <div className="w-5 flex justify-center"></div>
-                              <span className="text-gray-700">ส่วนลดสำหรับ {selectedServices.size} บริการ</span>
+                              <span className="text-gray-700 dark:text-gray-300">ส่วนลดสำหรับ {selectedServices.size} บริการ</span>
                             </div>
-                            <span className="font-medium text-green-600">-{savings.toFixed(0)} บาท</span>
+                            <span className="font-medium text-green-600">-{savings.toFixed(0)} THB</span>
                           </li>
                         </ul>
                       </div>
@@ -321,12 +340,12 @@ export default function AddBundlePage() {
                 
                 {nextBestOffer && (
                     <Card 
-                        className="mt-4 bg-yellow-50 border-yellow-400 cursor-pointer hover:bg-yellow-100"
+                        className="mt-4 bg-yellow-50 dark:bg-yellow-900/40 border-yellow-400 cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/60"
                         onClick={() => setSelectedServices(new Set(nextBestOffer.services as ServiceId[]))}
                     >
                         <div className="p-3">
-                            <p className="font-bold text-sm text-yellow-900 mb-1">ข้อเสนอสุดพิเศษ!</p>
-                            <p className="text-xs text-yellow-800">
+                            <p className="font-bold text-sm text-yellow-900 dark:text-yellow-200 mb-1">Special Offer!</p>
+                            <p className="text-xs text-yellow-800 dark:text-yellow-300">
                                 Add {nextBestOffer.services.length - selectedServices.size} more service(s) for just <span className="font-bold">{nextBestOffer.sellingPrice - total} THB</span> to get a discount!
                             </p>
                             <div className="flex items-center gap-2 mt-2">
@@ -340,18 +359,18 @@ export default function AddBundlePage() {
                 )}
 
                 {!isValidBundle && selectedServices.size > 0 && !nextBestOffer && (
-                  <Card className="mt-4 bg-red-50 border-red-200">
+                  <Card className="mt-4 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800">
                     <div className="p-3 flex items-center gap-3">
                       <AlertCircle className="w-5 h-5 text-red-600" />
-                      <p className="text-sm text-red-800">No bundle available for this combination.</p>
+                      <p className="text-sm text-red-800 dark:text-red-200">No bundle available for this combination.</p>
                     </div>
                   </Card>
                 )}
 
 
-                <div className="flex justify-between items-end pt-4 border-t mt-2">
-                    <span className="text-base font-semibold text-gray-800">Total (excl. VAT)</span>
-                    <span className="text-red-600 font-bold text-2xl">{selectedServices.size > 0 ? `${total.toFixed(0)} บาท` : '0 บาท'}</span>
+                <div className="flex justify-between items-end pt-4 border-t mt-2 dark:border-gray-700">
+                    <span className="text-base font-semibold text-gray-800 dark:text-gray-200">Total (excl. VAT)</span>
+                    <span className="font-bold text-2xl text-red-500">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : '0 THB'}</span>
                 </div>
             </div>
 
@@ -359,15 +378,15 @@ export default function AddBundlePage() {
                 <div className="space-y-3">
                     <div className="flex items-center gap-2">
                         {[1, 2, 3, 4].map(step => (
-                            <div key={step} className={cn("h-1.5 rounded-full flex-1", selectedServices.size >= step ? 'bg-red-500' : 'bg-gray-200')}></div>
+                            <div key={step} className={cn("h-1.5 rounded-full flex-1", selectedServices.size >= step ? 'bg-red-500' : 'bg-gray-200 dark:bg-gray-600')}></div>
                         ))}
                     </div>
                      <Button 
                         size="lg" 
-                        className="w-full bg-red-600 hover:bg-red-700 rounded-full h-12 text-lg font-bold" 
+                        className="w-full bg-red-500 hover:bg-red-600 rounded-full h-12 text-lg font-bold text-white" 
                         disabled={selectedServices.size === 0}
                      >
-                        {selectedServices.size > 0 ? "ถัดไป" : "Please select at least one service"}
+                        {selectedServices.size > 0 ? "Next" : "Please select at least one service"}
                     </Button>
                 </div>
             </div>
@@ -396,54 +415,59 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
     <div
       onClick={!finalIsDisabled ? onToggle : undefined}
       className={cn(
-        'p-4 rounded-xl border-2 bg-white transition-all',
-        isSelected ? 'border-red-500 bg-red-50' : 'border-gray-200',
-        finalIsDisabled ? 'bg-gray-200 border-gray-300 cursor-not-allowed opacity-60' : 'cursor-pointer'
+        'p-4 rounded-xl border-2 bg-white dark:bg-gray-800 transition-all',
+        isSelected ? 'border-red-500 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700',
+        finalIsDisabled ? 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600 cursor-not-allowed opacity-60' : 'cursor-pointer'
       )}
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
             <Checkbox 
               checked={isSelected}
               disabled={finalIsDisabled}
               className={cn(
                 "w-5 h-5 mt-0.5 rounded border-2", 
-                isSelected ? "data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500" : "border-red-500",
-                finalIsDisabled && "data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-500 border-gray-500"
+                isSelected ? "data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500" : "border-gray-400 dark:border-gray-500",
+                "text-white"
               )} 
             />
-            <Icon 
-              className={cn("w-10 h-10 object-contain shrink-0", service.id.startsWith('netflix') && 'w-7 h-10')} 
-              serviceId={service.id}
-            />
-            <div className="flex-grow min-w-0">
-              <span className={cn("font-bold text-base", finalIsDisabled && "text-gray-500")}>{title}</span>
-              <div className="min-h-[1.25rem] mt-1 pr-2">
-                 {isConflicting && <p className="text-xs text-destructive font-semibold">Only one Netflix plan allowed.</p>}
-                 {isDisabled && !isSelected && !isConflicting && <p className="text-xs text-destructive font-semibold">Maximum of {MAX_SELECTION_LIMIT} services allowed.</p>}
+            <div className="flex-1 flex items-center gap-3">
+              <Icon 
+                className={cn("w-10 h-10 object-contain shrink-0", service.id.startsWith('netflix') && 'w-7 h-10')} 
+                serviceId={service.id}
+              />
+              <div className="flex-grow min-w-0">
+                <span className={cn("font-bold text-base text-gray-800 dark:text-gray-200", finalIsDisabled && "text-gray-500")}>{title}</span>
+                <div className="min-h-[1.25rem] mt-1 pr-2">
+                  {isConflicting && <p className="text-xs text-destructive font-semibold">Only one Netflix plan allowed.</p>}
+                  {isDisabled && !isSelected && !isConflicting && <p className="text-xs text-destructive font-semibold">Maximum of {MAX_SELECTION_LIMIT} services allowed.</p>}
+                </div>
               </div>
             </div>
         </div>
 
         <div className="text-right flex-shrink-0">
-            {isConflicting && priceInfo.originalPrice ? (
+            {isConflicting && priceInfo.text.startsWith('+0') ? (
               <>
-                <p className="text-sm text-muted-foreground line-through">{priceInfo.originalPrice}</p>
+                {priceInfo.originalPrice && <p className="text-sm text-muted-foreground line-through">{priceInfo.originalPrice}</p>}
                 <p className="font-bold text-lg text-green-600">+0 THB</p>
               </>
             ) : priceInfo.text && (
-              <p className={cn(
-                "font-bold text-lg whitespace-nowrap",
-                priceInfo.type === 'promo' && 'text-red-600',
-                priceInfo.text.startsWith('+') ? 'text-green-600' : 'text-red-600'
-              )}>
-                {priceInfo.text}
-              </p>
+              <>
+                {priceInfo.originalPrice && <p className="text-sm text-muted-foreground line-through">{priceInfo.originalPrice}</p>}
+                <p className={cn(
+                  "font-bold text-lg whitespace-nowrap",
+                  priceInfo.type === 'promo' ? 'text-red-500' : 
+                  priceInfo.text.startsWith('+') ? 'text-green-600' : 'text-gray-800 dark:text-gray-300'
+                )}>
+                  {priceInfo.text}
+                </p>
+              </>
             )}
         </div>
       </div>
        {(isSelected || (isConflicting && !isDisabled)) && (
-        <div className="pl-12 mt-3 space-y-1 text-gray-600 text-sm">
+        <div className="pl-12 mt-3 space-y-1 text-gray-600 dark:text-gray-400 text-sm">
             {service.plans[0].features.map((feature, index) => (
                 <div key={index} className="flex items-center gap-2">
                     {feature.toLowerCase().includes('screen') || feature.toLowerCase().includes('480p') || feature.toLowerCase().includes('720p') || feature.toLowerCase().includes('1080p') || feature.toLowerCase().includes('4k') ? <Tv className="w-4 h-4"/> : <Globe className="w-4 h-4"/>}
