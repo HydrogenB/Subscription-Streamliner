@@ -63,9 +63,20 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
   });
 
   if (matchedOffers.length > 0) {
+    // If it's a single service and it's a Pack0 promo, return that.
+    if (selectedArray.length === 1 && matchedOffers.some(o => o.packName === 'Pack0')) {
+        return matchedOffers.find(o => o.packName === 'Pack0')!;
+    }
+    // Otherwise, return the best offer that is NOT a Pack0 (which are standalone promos)
+    const nonPack0Offers = matchedOffers.filter(o => o.packName !== 'Pack0');
+    if (nonPack0Offers.length > 0) {
+        return nonPack0Offers.reduce((best, current) =>
+            current.sellingPrice < best.sellingPrice ? current : best
+        );
+    }
+    // Fallback to any matched offer if only Pack0 was found for a multi-selection (should not happen with current data)
     return matchedOffers.reduce((best, current) =>
-      current.sellingPrice < best.sellingPrice ? current : best,
-    matchedOffers[0]
+        current.sellingPrice < best.sellingPrice ? current : best
     );
   }
   
@@ -172,16 +183,23 @@ export default function AddBundlePage() {
   
     const standalonePrice = service.plans[0].price;
   
-    // Check for single-item promotional offer
-    const singleOffer = findBestOffer(new Set([serviceId]));
-    if (singleOffer && singleOffer.sellingPrice < standalonePrice) {
+    // If nothing is selected, show standalone promos or default prices.
+    if (selectedServices.size === 0) {
+      const singleOffer = findBestOffer(new Set([serviceId]));
+      if (singleOffer && singleOffer.sellingPrice < standalonePrice) {
+        return {
+          text: `${singleOffer.sellingPrice.toFixed(0)} THB`,
+          originalPrice: `${standalonePrice.toFixed(0)} THB`,
+          type: 'promo',
+        };
+      }
       return {
-        text: `${singleOffer.sellingPrice.toFixed(0)} THB`,
-        originalPrice: `${standalonePrice.toFixed(0)} THB`,
-        type: 'promo',
+        text: `${standalonePrice.toFixed(0)} THB`,
+        type: 'default',
       };
     }
   
+    // If items are selected, always show the incremental price.
     const potentialSelection = new Set(selectedServices);
     if (NETFLIX_PLANS.includes(serviceId)) {
       NETFLIX_PLANS.forEach(p => potentialSelection.delete(p));
@@ -192,20 +210,18 @@ export default function AddBundlePage() {
   
     if (nextOffer) {
       const increment = nextOffer.sellingPrice - total;
-      if (increment > 0) {
-        return {
-          text: `+${increment.toFixed(0)} THB`,
-          originalPrice: `Adds ${serviceDisplayConfig[serviceId].title}`,
-          type: 'bundle',
-        };
-      }
+      return {
+        text: `+${increment.toFixed(0)} THB`,
+        type: 'bundle',
+      };
     }
-  
-    // Default to showing the standalone price if no better logic applies
-    return {
-      text: `+${standalonePrice.toFixed(0)} THB`,
-      type: 'default',
-    };
+    
+    // Fallback: if adding the service doesn't create a bundle, add its standalone price.
+    const increment = standalonePrice;
+     return {
+        text: `+${increment.toFixed(0)} THB`,
+        type: 'default',
+      };
   };
 
 
@@ -375,7 +391,7 @@ export default function AddBundlePage() {
                          <Button 
                             size="lg" 
                             className="w-full bg-red-600 hover:bg-red-700 rounded-full h-12 text-lg font-bold" 
-                            disabled={selectedServices.size === 0}
+                            disabled={selectedServices.size === 0 || (!isValidBundle && selectedServices.size > 1)}
                          >
                             ถัดไป
                         </Button>
@@ -443,7 +459,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
             <p className={cn(
               "font-bold text-lg whitespace-nowrap",
               priceInfo.type === 'promo' && 'text-red-600',
-              (priceInfo.type === 'bundle' || priceInfo.type === 'default') && 'text-green-600'
+              (priceInfo.type === 'bundle' || (priceInfo.type === 'default' && priceInfo.text.startsWith('+'))) && 'text-green-600'
             )}>
               {priceInfo.text}
             </p>
