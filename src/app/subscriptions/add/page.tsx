@@ -181,7 +181,10 @@ export default function AddBundlePage() {
                                 <OfferCard 
                                     offer={bundle} 
                                     allServices={allServices} 
-                                    onSelect={() => setSelectedServices(new Set(bundle.services as ServiceId[]))} 
+                                    onSelect={() => {
+                                      setSelectedServices(new Set(bundle.services as ServiceId[]));
+                                      setIsSummaryOpen(true);
+                                    }} 
                                   />
                               </div>
                           </CarouselItem>
@@ -354,23 +357,28 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
             );
         }
         
-        const currentTotal = calculateTotalPrice(selectedServices);
         let incrementalCost: number;
-        
+        const currentTotal = calculateTotalPrice(selectedServices);
+
         if (isNetflixService && selectedNetflixPlan) {
-            const tempSelection = new Set(selectedServices);
-            tempSelection.delete(selectedNetflixPlan);
-            tempSelection.add(service.id as ServiceId);
-            const newTotal = calculateTotalPrice(tempSelection);
-            incrementalCost = newTotal - calculateTotalPrice(new Set([...selectedServices].filter(id => id !== selectedNetflixPlan)));
+            // This is a Netflix plan replacement scenario
+            const tempSelectionWithoutOldNetflix = new Set(selectedServices);
+            tempSelectionWithoutOldNetflix.delete(selectedNetflixPlan);
+            const totalWithoutOldNetflix = calculateTotalPrice(tempSelectionWithoutOldNetflix);
+
+            const tempSelectionWithNewNetflix = new Set(tempSelectionWithoutOldNetflix);
+            tempSelectionWithNewNetflix.add(service.id as ServiceId);
+            const newTotal = calculateTotalPrice(tempSelectionWithNewNetflix);
+
+            incrementalCost = newTotal - totalWithoutOldNetflix;
         } else {
+            // Standard addition scenario
             const potentialSelection = new Set(selectedServices);
             potentialSelection.add(service.id as ServiceId);
             const newTotal = calculateTotalPrice(potentialSelection);
             incrementalCost = newTotal - currentTotal;
         }
-
-        const sign = incrementalCost < 0 ? "-" : "+";
+        
         const displayCost = Math.abs(incrementalCost);
 
         if (incrementalCost < 0) {
@@ -387,7 +395,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
         return (
             <div className="text-right">
                 <p className={cn("font-bold text-lg", incrementalCost >= 0 ? "text-primary" : "text-green-600")}>
-                  {sign}{displayCost.toFixed(0)} THB
+                  +{displayCost.toFixed(0)} THB
                 </p>
                 <p className="text-xs text-muted-foreground line-through">{service.plans[0].price.toFixed(0)} THB</p>
             </div>
