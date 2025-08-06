@@ -160,11 +160,11 @@ export default function AddBundlePage() {
     if (nextOffer) {
       let currentTotal;
 
-      const currentOffer = findBestOffer(baseSelection);
+      const currentOffer = findBestOffer(selectedServices); // Use original `selectedServices`
       if (currentOffer) {
         currentTotal = currentOffer.sellingPrice;
       } else {
-        currentTotal = Array.from(baseSelection).reduce((acc, id) => {
+        currentTotal = Array.from(selectedServices).reduce((acc, id) => {
             const service = subscriptionServices.find(s => s.id === id);
             return acc + (service?.plans[0].price || 0);
         }, 0);
@@ -234,20 +234,20 @@ export default function AddBundlePage() {
       <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-10">
         <div className="relative">
           <button 
-            onClick={() => setIsSummaryOpen(!isSummaryOpen)}
+            onClick={() => setIsSummaryOpen(prev => !prev)}
             className="absolute -top-3 left-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center border"
           >
             {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-red-500" /> : <ChevronUp className="w-5 h-5 text-red-500" />}
           </button>
         </div>
         <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-transform duration-300 ease-in-out", isSummaryOpen ? "translate-y-0" : "translate-y-[calc(100%-140px)]")}>
-          <div className="p-4">
-            <div className="flex justify-between items-center" onClick={() => setIsSummaryOpen(!isSummaryOpen)}>
+          <div className="p-4 cursor-pointer" onClick={() => setIsSummaryOpen(prev => !prev)}>
+            <div className="flex justify-between items-center">
                <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
                <span className="text-sm font-mono text-muted-foreground">{isValidBundle ? packName : ''}</span>
             </div>
           </div>
-          <div className={cn("px-4 pb-4 space-y-4 transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
+          <div className={cn("px-4 pb-4 space-y-4 overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
             
             { savings > 0 ? (
               <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold text-center">
