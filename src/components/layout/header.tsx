@@ -5,7 +5,7 @@ import { Clapperboard, Menu, X, ArrowLeft } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetTrigger } from "@/components/ui/sheet";
 
 const navLinks = [
   { href: "/subscriptions", label: "Browse" },
@@ -43,6 +43,10 @@ export function Header({ showBackButton = false, title }: { showBackButton?: boo
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-full">
+              <SheetHeader className="sr-only">
+                <SheetTitle>Menu</SheetTitle>
+                <SheetDescription>Main navigation menu for the application.</SheetDescription>
+              </SheetHeader>
               <div className="flex justify-between items-center mb-8">
                 <Link href="/" onClick={() => setIsOpen(false)} className="flex items-center space-x-2">
                   <Clapperboard className="h-6 w-6 text-primary" />
