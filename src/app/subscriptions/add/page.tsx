@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -7,7 +8,7 @@ import { Header } from '@/components/layout/header';
 import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { SubscriptionService, OfferGroup, ServiceId } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Tv, Gift, ChevronUp, AlertCircle } from 'lucide-react';
+import { Gift, ChevronUp, AlertCircle, Sparkles, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NetflixIcon } from '@/components/icons/netflix-icon';
 import { YouTubeIcon } from '@/components/icons/youtube-icon';
@@ -17,6 +18,8 @@ import { WeTVIcon } from '@/components/icons/wetv-icon';
 import { OneDIcon } from '@/components/icons/oned-icon';
 import { TrueIDIcon } from '@/components/icons/trueid-icon';
 import { Card } from '@/components/ui/card';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
+import { OfferCard } from '@/components/subscriptions/offer-card';
 
 const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: string }> = {
   youtube: { Icon: YouTubeIcon, title: 'Youtube Premium' },
@@ -39,9 +42,6 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
 
   const selectedArray = Array.from(selectedIds).sort();
   
-  let bestOffer: OfferGroup | null = null;
-
-  // Check for exact match first
   const matchedOffers = offerGroups.filter(offer => {
     if (offer.services.length !== selectedArray.length) {
       return false;
@@ -51,23 +51,22 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
   });
 
   if (matchedOffers.length > 0) {
-     bestOffer = matchedOffers.reduce((best, current) =>
+     return matchedOffers.reduce((best, current) =>
         current.sellingPrice < best.sellingPrice ? current : best
     );
   }
   
-  // If no exact match, check for single service offers ("Pack0")
-  if (!bestOffer && selectedIds.size === 1) {
+  if (selectedIds.size === 1) {
     const singleServiceId = selectedArray[0];
     const singleOffer = offerGroups.find(o => 
-        o.services.length === 1 && o.services[0] === singleServiceId
+        o.packName === 'Pack0' && o.services.length === 1 && o.services[0] === singleServiceId
     );
     if (singleOffer) {
         return singleOffer;
     }
   }
 
-  return bestOffer;
+  return null;
 }
 
 function findNextBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
@@ -77,6 +76,7 @@ function findNextBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
 
     const potentialOffers = offerGroups.filter(offer => {
         if (offer.services.length <= selectedIds.size) return false;
+        if (offer.packName === 'Pack0') return false; // Exclude standalone offers
         const selectedIdArray = Array.from(selectedIds);
         return selectedIdArray.every(id => offer.services.includes(id));
     });
@@ -96,6 +96,7 @@ const NETFLIX_PLANS: ServiceId[] = ['netflix-mobile', 'netflix-basic', 'netflix-
 const MAX_SELECTION_LIMIT = 4;
 
 const allServices = subscriptionServices;
+const curatedOffers = offerGroups.filter(o => o.services.length > 1 && o.packName !== 'Pack0').slice(0, 10);
 
 export default function AddBundlePage() {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set([]));
@@ -153,14 +154,6 @@ export default function AddBundlePage() {
     if (isValidBundle) return null;
     return findNextBestOffer(selectedServices);
   }, [selectedServices, isValidBundle]);
-
-  const isNetflixConflict = (serviceId: ServiceId): boolean => {
-    if (!NETFLIX_PLANS.includes(serviceId)) {
-      return false;
-    }
-    const selectedNetflixPlan = NETFLIX_PLANS.find(plan => selectedServices.has(plan));
-    return !!selectedNetflixPlan && selectedNetflixPlan !== serviceId;
-  }
   
   const handleNext = () => {
     if (selectedServices.size === 0) return;
@@ -172,29 +165,39 @@ export default function AddBundlePage() {
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       <Header showBackButton title="Add bundle" />
       <main className="flex-grow overflow-y-auto pb-48">
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-6">
           
-          <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg flex items-center gap-3 text-sm text-blue-800 dark:text-blue-300">
-            <Gift className="w-5 h-5 text-blue-500" />
-            <span>Select your favorite services to see bundle deals!</span>
+          <div>
+            <h2 className="text-2xl font-bold text-center">Find Your Perfect Bundle</h2>
+            <p className="text-muted-foreground text-center mb-4">Save more with our curated bundles or build your own.</p>
+            <Carousel opts={{ align: "start", loop: true }} className="w-full">
+              <CarouselContent className="-ml-2">
+                {curatedOffers.map((offer) => (
+                  <CarouselItem key={offer.id} className="pl-2 basis-4/5 md:basis-1/2">
+                    <OfferCard offer={offer} allServices={allServices} onSelect={() => setSelectedServices(new Set(offer.services as ServiceId[]))} />
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious className="hidden md:flex" />
+              <CarouselNext className="hidden md:flex" />
+            </Carousel>
           </div>
-
-          <div className="space-y-3">
-            {allServices.map(service => (
-              <ServiceCard 
-                key={service.id}
-                service={service}
-                Icon={serviceDisplayConfig[service.id as ServiceId].Icon}
-                title={serviceDisplayConfig[service.id as ServiceId].title}
-                isSelected={selectedServices.has(service.id as ServiceId)}
-                onToggle={() => handleServiceToggle(service.id as ServiceId)}
-                isConflicting={isNetflixConflict(service.id as ServiceId)}
-                isDisabled={
-                    !selectedServices.has(service.id as ServiceId) &&
-                    selectedServices.size >= MAX_SELECTION_LIMIT
-                }
-              />
-            ))}
+          
+          <div>
+            <h2 className="text-xl font-bold text-center mb-4">Or build your own bundle</h2>
+            <div className="space-y-3">
+              {allServices.map(service => (
+                <ServiceCard 
+                  key={service.id}
+                  service={service}
+                  Icon={serviceDisplayConfig[service.id as ServiceId].Icon}
+                  title={serviceDisplayConfig[service.id as ServiceId].title}
+                  isSelected={selectedServices.has(service.id as ServiceId)}
+                  onToggle={() => handleServiceToggle(service.id as ServiceId)}
+                  selectedServices={selectedServices}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </main>
@@ -331,40 +334,82 @@ interface ServiceCardProps {
   title: string;
   isSelected: boolean;
   onToggle: () => void;
-  isConflicting: boolean;
-  isDisabled: boolean;
+  selectedServices: Set<ServiceId>;
 }
 
-function ServiceCard({ service, Icon, title, isSelected, onToggle, isConflicting, isDisabled }: ServiceCardProps) {
-  const finalIsDisabled = isDisabled && !isSelected;
+function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServices }: ServiceCardProps) {
+    const isNetflixConflict = NETFLIX_PLANS.includes(service.id as ServiceId) && 
+        NETFLIX_PLANS.some(plan => selectedServices.has(plan) && plan !== service.id);
+
+    const isDisabled = (!isSelected && selectedServices.size >= MAX_SELECTION_LIMIT) || isNetflixConflict;
+
+    const getPriceInfo = () => {
+        const standaloneOffer = offerGroups.find(o => o.packName === 'Pack0' && o.services[0] === service.id);
+        const originalPrice = service.plans[0].price;
+
+        if (selectedServices.size === 0) {
+            if (standaloneOffer && standaloneOffer.sellingPrice < originalPrice) {
+                return (
+                    <div className="text-right">
+                        <p className="font-bold text-red-600 text-lg">{standaloneOffer.sellingPrice.toFixed(0)} THB</p>
+                        <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
+                    </div>
+                );
+            }
+            return <p className="font-bold text-primary text-lg">{originalPrice.toFixed(0)} THB</p>;
+        }
+
+        if (isSelected) {
+            return (
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                    <Check className="w-5 h-5 text-white" />
+                </div>
+            )
+        }
+        
+        const tempSelection = new Set(selectedServices);
+        tempSelection.add(service.id as ServiceId);
+        const nextOffer = findBestOffer(tempSelection);
+
+        const currentTotal = findBestOffer(selectedServices)?.sellingPrice ?? Array.from(selectedServices).reduce((acc, id) => acc + (subscriptionServices.find(s => s.id === id)?.plans[0].price ?? 0), 0);
+
+        if (nextOffer) {
+            const addedCost = nextOffer.sellingPrice - currentTotal;
+            return <p className="font-bold text-green-600 text-lg">+{addedCost.toFixed(0)} THB</p>;
+        }
+        
+        if (standaloneOffer) {
+            return <p className="font-bold text-primary text-lg">+{standaloneOffer.sellingPrice.toFixed(0)} THB</p>;
+        }
+
+        return <p className="font-bold text-primary text-lg">+{originalPrice.toFixed(0)} THB</p>;
+    }
   
   return (
     <div
-      onClick={!finalIsDisabled ? onToggle : undefined}
+      onClick={!isDisabled ? onToggle : undefined}
       className={cn(
-        'p-4 rounded-xl border-2 bg-white dark:bg-gray-800 transition-all',
-        isSelected ? 'border-primary' : 'border-gray-200 dark:border-gray-700',
-        finalIsDisabled ? 'bg-gray-100 dark:bg-gray-700/50 border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-50' : 'cursor-pointer'
+        'p-3 rounded-xl border-2 bg-white dark:bg-gray-800 transition-all flex items-center gap-4',
+        isSelected ? 'border-primary shadow-lg' : 'border-gray-200 dark:border-gray-700',
+        isDisabled ? 'bg-gray-100 dark:bg-gray-700/50 border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-60' : 'cursor-pointer'
       )}
     >
-      <div className="flex items-center gap-4">
+        <div className={cn("w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0", isSelected ? "bg-primary border-primary" : "border-gray-300")}>
+            {isSelected && <Check className="w-4 h-4 text-white" />}
+        </div>
+
         <Icon 
           className={cn("w-10 h-10 object-contain shrink-0", service.id.startsWith('netflix') && 'w-7 h-10')} 
           serviceId={service.id}
         />
         <div className="flex-grow min-w-0">
-          <p className={cn("font-bold text-base text-gray-800 dark:text-gray-200", finalIsDisabled && "text-gray-500")}>{title}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{service.plans[0].features.join(', ')}</p>
+          <p className={cn("font-bold text-base text-gray-800 dark:text-gray-200")}>{title}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{service.plans[0].features.join(' • ')}</p>
         </div>
-      </div>
-      {(isConflicting || (isDisabled && !isSelected)) && (
-         <div className="mt-2 pl-14">
-            {isConflicting && <p className="text-xs text-destructive font-semibold">Only one Netflix plan can be selected.</p>}
-            {isDisabled && !isSelected && !isConflicting && <p className="text-xs text-destructive font-semibold">Maximum of {MAX_SELECTION_LIMIT} services allowed.</p>}
+        <div className="ml-auto text-right">
+            {getPriceInfo()}
         </div>
-      )}
+        {isNetflixConflict && <p className="text-xs text-destructive font-semibold absolute bottom-1 right-3">Only one Netflix plan allowed.</p>}
     </div>
   )
 }
-
-    
