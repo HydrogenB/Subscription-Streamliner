@@ -61,7 +61,7 @@ export default function SubscriptionsPage() {
       </div>
 
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="w-full max-w-full p-0 flex flex-col">
+        <SheetContent className="w-full p-0 flex flex-col">
           {selectedService && (
             <>
               <SheetHeader className="p-6">
@@ -78,7 +78,7 @@ export default function SubscriptionsPage() {
                       <Label key={plan.id} htmlFor={plan.id} className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-muted/50 has-[[data-state=checked]]:border-primary">
                         <div className="space-y-1">
                           <span className="font-semibold">{plan.name}</span>
-                          <span className="text-sm text-muted-foreground">${plan.price.toFixed(2)}/month</span>
+                          <span className="text-sm text-muted-foreground">THB {plan.price.toFixed(2)}/month</span>
                         </div>
                         <RadioGroupItem value={plan.id} id={plan.id} />
                       </Label>
@@ -94,7 +94,7 @@ export default function SubscriptionsPage() {
                           <div className="space-y-1">
                             <Label htmlFor={addon.id} className="font-semibold cursor-pointer">{addon.name}</Label>
                             <p className="text-sm text-muted-foreground">{addon.description}</p>
-                            <p className="text-sm font-medium text-primary">+${addon.price.toFixed(2)}/month</p>
+                            <p className="text-sm font-medium text-primary">+THB {addon.price.toFixed(2)}/month</p>
                           </div>
                           <Checkbox
                             id={addon.id}
@@ -112,7 +112,7 @@ export default function SubscriptionsPage() {
                   <Separator />
                   <div className="flex justify-between items-center text-xl font-bold">
                     <span>Total:</span>
-                    <span>${totalPrice.toFixed(2)}<span className="text-base font-normal text-muted-foreground">/month</span></span>
+                    <span>THB {totalPrice.toFixed(2)}<span className="text-base font-normal text-muted-foreground">/month</span></span>
                   </div>
                   <Button size="lg" className="w-full">Add to Cart</Button>
                 </div>

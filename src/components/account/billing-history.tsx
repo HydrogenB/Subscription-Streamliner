@@ -25,7 +25,7 @@ export function BillingHistory() {
               <TableRow key={item.id}>
                 <TableCell className="font-medium">{item.date}</TableCell>
                 <TableCell>{item.description}</TableCell>
-                <TableCell className="text-right">${item.amount.toFixed(2)}</TableCell>
+                <TableCell className="text-right">THB {item.amount.toFixed(2)}</TableCell>
               </TableRow>
             ))}
              {billingHistory.length === 0 && (

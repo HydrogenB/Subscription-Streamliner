@@ -15,7 +15,7 @@ export function SubscriptionCard({ service, onCustomizeClick }: SubscriptionCard
   return (
     <Card className="flex flex-col transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
       <CardHeader className="flex-row gap-4 items-center">
-        <Logo className="w-12 h-12" />
+        <Logo className="w-16 h-10" />
         <div>
           <CardTitle className="font-headline">{name}</CardTitle>
           <CardDescription>{description}</CardDescription>
@@ -30,7 +30,7 @@ export function SubscriptionCard({ service, onCustomizeClick }: SubscriptionCard
         )}
         <div className="text-muted-foreground">
           <span className="text-sm">Plans from </span>
-          <span className="text-2xl font-bold text-foreground">${Math.min(...plans.map(p => p.price)).toFixed(2)}</span>
+          <span className="text-2xl font-bold text-foreground">THB {Math.min(...plans.map(p => p.price)).toFixed(2)}</span>
           <span className="text-sm">/month</span>
         </div>
       </CardContent>

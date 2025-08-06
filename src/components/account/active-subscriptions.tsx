@@ -26,7 +26,7 @@ export function ActiveSubscriptions() {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">
-                ${sub.price.toFixed(2)}
+                THB {sub.price.toFixed(2)}
                 <span className="text-base font-normal text-muted-foreground">/month</span>
               </p>
             </CardContent>
