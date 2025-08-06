@@ -188,7 +188,7 @@ export default function AddBundlePage() {
       <div className="p-4 space-y-4 flex-grow overflow-y-auto pb-48">
         <h2 className="text-xl font-bold">{packName}</h2>
         { !isValidBundle && selectedServices.size > 0 ? (
-          <div className="bg-destructive/10 border-l-4 border-destructive text-destructive-foreground p-3 rounded-lg flex items-center gap-3 text-sm">
+          <div className="bg-destructive/10 border-l-4 border-destructive text-destructive p-3 rounded-lg flex items-center gap-3 text-sm">
             <AlertCircle className="w-5 h-5" />
             <span>This combination is not available as a bundle. Please adjust your selection.</span>
           </div>
