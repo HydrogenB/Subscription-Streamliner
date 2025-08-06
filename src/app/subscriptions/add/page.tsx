@@ -19,6 +19,7 @@ import { OneDIcon } from '@/components/icons/oned-icon';
 import { TrueIDIcon } from '@/components/icons/trueid-icon';
 import { Card } from '@/components/ui/card';
 import { OfferCard } from '@/components/subscriptions/offer-card';
+import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
 
 const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: string }> = {
   youtube: { Icon: YouTubeIcon, title: 'Youtube Premium' },
@@ -149,16 +150,26 @@ export default function AddBundlePage() {
             <div>
               <h2 className="text-xl font-bold text-center">Hero Bundles</h2>
               <p className="text-muted-foreground text-center mb-4">Our most popular bundles with great savings.</p>
-              <div className="space-y-4">
-                {heroBundles.map(bundle => (
-                  <OfferCard 
-                    key={bundle.id}
-                    offer={bundle} 
-                    allServices={allServices} 
-                    onSelect={() => setSelectedServices(new Set(bundle.services as ServiceId[]))} 
-                  />
-                ))}
-              </div>
+              <Carousel
+                opts={{
+                    align: "start",
+                }}
+                className="w-full max-w-sm mx-auto"
+              >
+                  <CarouselContent>
+                      {heroBundles.map((bundle) => (
+                          <CarouselItem key={bundle.id} className="basis-11/12">
+                              <div className="p-1 h-full">
+                                <OfferCard 
+                                    offer={bundle} 
+                                    allServices={allServices} 
+                                    onSelect={() => setSelectedServices(new Set(bundle.services as ServiceId[]))} 
+                                  />
+                              </div>
+                          </CarouselItem>
+                      ))}
+                  </CarouselContent>
+              </Carousel>
             </div>
           )}
           
@@ -334,10 +345,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
             tempSelection.delete(selectedNetflixPlan);
             tempSelection.add(service.id as ServiceId);
             const newTotal = calculateTotalPrice(tempSelection);
-            const oldNetflixPrice = subscriptionServices.find(s => s.id === selectedNetflixPlan)?.plans[0].price || 0;
-            const currentTotalWithoutOldNetflix = calculateTotalPrice(new Set(Array.from(selectedServices).filter(id => id !== selectedNetflixPlan)));
-            const newNetflixPrice = service.plans[0].price;
-
+            
             const selectionWithoutAnyNetflix = new Set(selectedServices);
             selectionWithoutAnyNetflix.delete(selectedNetflixPlan);
             const priceWithoutAnyNetflix = calculateTotalPrice(selectionWithoutAnyNetflix);
