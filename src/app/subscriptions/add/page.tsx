@@ -119,7 +119,7 @@ export default function AddBundlePage() {
             const service = subscriptionServices.find(s => s.id === id);
             return acc + (service?.plans[0].price || 0);
         }, 0);
-        return { total: currentFullPrice, savings: 0, packName: "Invalid Bundle Combination", isValidBundle: false, fullPrice: currentFullPrice };
+        return { total: currentFullPrice, savings: 0, packName: "Custom Bundle", isValidBundle: false, fullPrice: currentFullPrice };
     }
 
     return { total: 0, savings: 0, packName: "Choose your bundle", isValidBundle: false, fullPrice: 0 };
@@ -130,20 +130,17 @@ export default function AddBundlePage() {
   const getPriceInfo = (serviceId: ServiceId): { text: string; originalPrice?: string; isIncremental: boolean } => {
     const service = subscriptionServices.find(s => s.id === serviceId);
     if (!service) return { text: '', isIncremental: false };
-  
+
+    const standaloneOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
+    const standalonePrice = standaloneOffer?.sellingPrice || service.plans[0].price;
+
     if (selectedServices.has(serviceId)) {
       return { text: '', isIncremental: false };
     }
   
-    const baseSelectionForOffer = new Set(selectedServices);
-    if(baseSelectionForOffer.size === 0) {
-        const singleServiceSelection = new Set([serviceId]);
-        const singleOffer = findBestOffer(singleServiceSelection);
-        if(singleOffer) {
-            return { text: `${singleOffer.sellingPrice} THB`, isIncremental: false };
-        }
+    if (selectedServices.size === 0) {
+      return { text: `${standalonePrice.toFixed(0)} THB`, isIncremental: false };
     }
-
 
     if (selectedServices.size >= MAX_SELECTION_LIMIT) {
         return { text: '', isIncremental: false };
@@ -151,37 +148,23 @@ export default function AddBundlePage() {
     
     let baseSelection = new Set(selectedServices);
     if (NETFLIX_PLANS.includes(serviceId)) {
-      NETFLIX_PLANS.forEach(plan => {
-        if (baseSelection.has(plan)) {
-          baseSelection.delete(plan);
-        }
-      });
+      NETFLIX_PLANS.forEach(plan => baseSelection.delete(plan));
     }
   
     const potentialSelection = new Set(baseSelection);
     potentialSelection.add(serviceId);
   
     const nextOffer = findBestOffer(potentialSelection);
-  
+    
     if (nextOffer) {
-      let currentTotal;
-
       const currentOffer = findBestOffer(selectedServices);
-      if (currentOffer) {
-        currentTotal = currentOffer.sellingPrice;
-      } else if (selectedServices.size > 0) {
-        currentTotal = Array.from(selectedServices).reduce((acc, id) => {
-            const service = subscriptionServices.find(s => s.id === id);
-            return acc + (service?.plans[0].price || 0);
-        }, 0);
-      } else {
-         currentTotal = 0;
-      }
+      const currentTotal = currentOffer ? currentOffer.sellingPrice : Array.from(selectedServices).reduce((acc, id) => {
+        const s = subscriptionServices.find(s => s.id === id);
+        return acc + (s?.plans[0].price || 0);
+      }, 0);
       
       const increment = nextOffer.sellingPrice - currentTotal;
-      const standaloneOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
-      const standalonePrice = standaloneOffer?.sellingPrice || service.plans[0].price;
-      
+
       const priceInfo: { text: string; originalPrice?: string; isIncremental: boolean } = {
         text: `+${increment.toFixed(0)} THB`,
         isIncremental: true,
@@ -193,39 +176,10 @@ export default function AddBundlePage() {
       
       return priceInfo;
     } else {
-      let currentTotal = 0;
-      if (selectedServices.size > 0) {
-          const currentOffer = findBestOffer(selectedServices);
-          if (currentOffer) {
-              currentTotal = currentOffer.sellingPrice;
-          } else {
-              currentTotal = Array.from(selectedServices).reduce((acc, id) => {
-                  const s = subscriptionServices.find(s => s.id === id);
-                  return acc + (s?.plans[0].price || 0);
-              }, 0);
-          }
-      }
-
+      // If adding the service does not result in a valid bundle, show its full standalone price.
       const servicePrice = service.plans[0].price;
-      const increment = servicePrice;
-      
-       const potentialSelectionWithService = new Set(selectedServices);
-       potentialSelectionWithService.add(serviceId);
-       const nextOfferWithService = findBestOffer(potentialSelectionWithService);
-       
-       if(!nextOfferWithService) {
-         const newTotal = Array.from(potentialSelectionWithService).reduce((acc, id) => {
-            const s = subscriptionServices.find(s => s.id === id);
-            return acc + (s?.plans[0].price || 0);
-         }, 0);
-         const newIncrement = newTotal - currentTotal;
-
-         return { text: `+${newIncrement.toFixed(0)} THB`, isIncremental: true, originalPrice: `${service.plans[0].price.toFixed(0)} THB` };
-       }
-
+      return { text: `${servicePrice.toFixed(0)} THB`, isIncremental: false };
     }
-  
-    return { text: `${service.plans[0].price} THB`, isIncremental: false };
   };
 
   const isNetflixConflict = (serviceId: ServiceId): boolean => {
@@ -239,7 +193,7 @@ export default function AddBundlePage() {
   const maxSavings = Math.max(...offerGroups.filter(o => o.services.length === 4).map(o => o.fullPrice - o.sellingPrice));
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50">
       <Header showBackButton title="Add bundle" />
       <main className="flex-grow overflow-y-auto pb-48">
         <div className="p-4 space-y-4">
@@ -271,17 +225,23 @@ export default function AddBundlePage() {
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-10">
-        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out pb-safe-bottom")}>
-          
+        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out", isSummaryOpen ? "pb-safe-bottom" : "pb-0")}>
           <div 
-            className="p-4 cursor-pointer border-b flex justify-between items-center" 
+            className="p-4 cursor-pointer border-b" 
             onClick={() => setIsSummaryOpen(prev => !prev)}
           >
-             <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
-             <div className="flex items-center gap-2">
-               <span className="text-sm font-mono text-muted-foreground">{isValidBundle ? packName : ''}</span>
-               {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-gray-500" /> : <ChevronUp className="w-5 h-5 text-gray-500" />}
-             </div>
+            <div className="flex justify-between items-center">
+               <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
+               <div className="flex items-center gap-2">
+                 {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-gray-500" /> : <ChevronUp className="w-5 h-5 text-gray-500" />}
+               </div>
+            </div>
+            {!isSummaryOpen && (
+              <div className="flex justify-between items-center mt-2">
+                  <span className="text-muted-foreground text-sm">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
+                  <span className="text-red-600 font-bold text-xl">{total.toFixed(0)} บาท</span>
+              </div>
+            )}
           </div>
 
           <div className={cn("px-4 pt-4 space-y-4 overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
@@ -331,33 +291,35 @@ export default function AddBundlePage() {
                 )}
               </div>
             )}
+            
+            { isSummaryOpen && (
+              <div className="flex justify-between items-center pt-4">
+                  <span className="text-muted-foreground">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
+                  <span className="text-red-600 font-bold text-xl">{total.toFixed(0)} บาท</span>
+              </div>
+            )}
           </div>
           
-          <div className="px-4 pb-4 pt-4 space-y-3 bg-white rounded-b-2xl">
+          <div className={cn("px-4 pb-4 pt-4 space-y-3 bg-white", isSummaryOpen && 'rounded-b-2xl', !isSummaryOpen && "pt-0")}>
               { !isValidBundle && selectedServices.size > 0 && (
                 <div className="bg-red-50 border-l-4 border-red-500 text-red-800 p-3 rounded-lg flex items-center gap-3 text-sm">
                   <AlertCircle className="w-5 h-5" />
                   <span>This combination is not available as a bundle. Please adjust your selection.</span>
                 </div>
               )}
-              <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
-                  <span className="text-red-600 font-bold text-xl">{total.toFixed(0)} บาท</span>
-              </div>
-              
+
               <div className="flex items-center gap-2">
                   {[1,2,3,4].map(step => (
                       <div key={step} className={cn("h-1.5 rounded-full flex-1", selectedServices.size >= step ? 'bg-red-500' : 'bg-gray-200')}></div>
                   ))}
               </div>
 
-              <Button size="lg" className="w-full bg-red-600 hover:bg-red-700 rounded-full" disabled={!isValidBundle || selectedServices.size === 0}>
+              <Button size="lg" className="w-full bg-red-600 hover:bg-red-700 rounded-full pb-safe-bottom" disabled={!isValidBundle || selectedServices.size === 0}>
                   ถัดไป
               </Button>
             </div>
         </div>
       </footer>
-
     </div>
   );
 }
