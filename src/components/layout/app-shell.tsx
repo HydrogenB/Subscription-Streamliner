@@ -1,3 +1,4 @@
+
 'use client';
 import { usePathname } from 'next/navigation';
 import { Footer } from './footer';
@@ -6,10 +7,14 @@ import { Header } from './header';
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Only show header and footer on specific pages
-  const showHeaderFooter = ![
+  const noHeaderFooterRoutes = [
     '/subscriptions/add',
-  ].includes(pathname);
+    '/subscriptions/confirm',
+    '/subscriptions/receipt',
+  ];
+  
+  const showHeaderFooter = !noHeaderFooterRoutes.some(path => pathname.startsWith(path));
+
 
   return (
     <div className="flex flex-col min-h-screen max-w-md mx-auto bg-background shadow-lg">
@@ -21,3 +26,5 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+    

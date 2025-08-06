@@ -1,7 +1,9 @@
 
+
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { SubscriptionService, OfferGroup } from '@/lib/types';
@@ -63,7 +65,6 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
   });
   
   if (matchedOffers.length > 0) {
-    // Return the best offer (lowest price)
     return matchedOffers.reduce((best, current) =>
         current.sellingPrice < best.sellingPrice ? current : best
     );
@@ -103,6 +104,7 @@ const allServices = subscriptionServices;
 export default function AddBundlePage() {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set([]));
   const [isSummaryOpen, setIsSummaryOpen] = useState(true);
+  const router = useRouter();
 
   const handleServiceToggle = (serviceId: ServiceId) => {
     setSelectedServices(prev => {
@@ -190,29 +192,27 @@ export default function AddBundlePage() {
     
     // If we have items selected, calculate the price to ADD this service
     if (selectedServices.size > 0) {
-        const potentialSelection = new Set(selectedServices);
-        potentialSelection.add(serviceId);
-        const nextOffer = findBestOffer(potentialSelection);
-        const currentTotal = total;
-        
-        if (nextOffer) {
-            // Price to add is the difference between the new bundle price and current total
-            const increment = nextOffer.sellingPrice - currentTotal;
-            return { text: `+${increment.toFixed(0)} THB`, type: 'default' };
-        } else {
-            // If no bundle, just add the standalone price
-            const standalonePrice = service.plans[0].price;
-            return { text: `+${standalonePrice.toFixed(0)} THB`, type: 'default' };
-        }
+      const potentialSelection = new Set(selectedServices);
+      potentialSelection.add(serviceId);
+      const nextOffer = findBestOffer(potentialSelection);
+      const currentTotal = total;
+      
+      if (nextOffer) {
+          const increment = nextOffer.sellingPrice - currentTotal;
+          return { text: `+${increment.toFixed(0)} THB`, type: 'default' };
+      } else {
+          const standalonePrice = service.plans[0].price;
+          return { text: `+${standalonePrice.toFixed(0)} THB`, type: 'default' };
+      }
     }
   
     // This is the initial state (no services selected). Show promo or default price.
     const standalonePrice = service.plans[0].price;
-    const singleOffer = findBestOffer(new Set([serviceId]));
+    const singleOffer = offerGroups.find(o => o.packName === 'Pack0' && o.services.length === 1 && o.services[0] === serviceId);
     
     if (singleOffer && singleOffer.sellingPrice < standalonePrice) {
       return {
-        text: `${singleOffer.sellingPrice.toFixed(0)} THB`,
+        text: `Claim for ${singleOffer.sellingPrice.toFixed(0)} THB`,
         originalPrice: `${standalonePrice.toFixed(0)} THB`,
         type: 'promo',
       };
@@ -232,6 +232,12 @@ export default function AddBundlePage() {
     return !!selectedNetflixPlan && selectedNetflixPlan !== serviceId;
   }
   
+  const handleNext = () => {
+    if (selectedServices.size === 0) return;
+    const serviceIds = Array.from(selectedServices).join(',');
+    router.push(`/subscriptions/confirm?services=${serviceIds}`);
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       <Header showBackButton title="Add bundle" />
@@ -375,6 +381,7 @@ export default function AddBundlePage() {
                         size="lg" 
                         className="w-full bg-red-500 hover:bg-red-600 rounded-full h-12 text-lg font-bold text-white" 
                         disabled={selectedServices.size === 0}
+                        onClick={handleNext}
                      >
                         {selectedServices.size > 0 ? "Next" : "Please select at least one service"}
                     </Button>
