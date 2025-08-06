@@ -1,12 +1,5 @@
 import type { ComponentType, SVGProps } from 'react';
 
-export interface Addon {
-  id: string;
-  name: string;
-  price: number;
-  description: string;
-}
-
 export interface Plan {
   id: string;
   name: string;
@@ -20,6 +13,13 @@ export interface SubscriptionService {
   logo: ComponentType<SVGProps<SVGSVGElement>>;
   description: string;
   plans: Plan[];
-  addons: Addon[];
-  promotion?: string;
+}
+
+export interface OfferGroup {
+    id: string;
+    packName: string;
+    services: string[];
+    fullPrice: number;
+    sellingPrice: number;
+    promotion?: string;
 }

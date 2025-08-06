@@ -1,126 +1,150 @@
 'use client';
-import { useState } from 'react';
-import type { SubscriptionService, Plan, Addon } from '@/lib/types';
-import { subscriptionServices } from '@/lib/data';
-import { SubscriptionCard } from '@/components/subscriptions/subscription-card';
+import { useState, useMemo } from 'react';
+import { subscriptionServices, offerGroups, type OfferGroup } from '@/lib/data';
+import type { SubscriptionService } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from '@/components/ui/sheet';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
+import { Package, Tag, ArrowRight } from 'lucide-react';
+import { OfferCard } from '@/components/subscriptions/offer-card';
 
 export default function SubscriptionsPage() {
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<SubscriptionService | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
-  const [selectedAddons, setSelectedAddons] = useState<Addon[]>([]);
-  const [totalPrice, setTotalPrice] = useState(0);
+  const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
 
-  const handleCustomizeClick = (service: SubscriptionService) => {
-    setSelectedService(service);
-    const defaultPlan = service.plans[0];
-    setSelectedPlan(defaultPlan);
-    setSelectedAddons([]);
-    setTotalPrice(defaultPlan?.price || 0);
-    setIsSheetOpen(true);
+  const handleServiceToggle = (serviceId: string) => {
+    setSelectedServices(prev => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(serviceId)) {
+        newSelection.delete(serviceId);
+      } else {
+        newSelection.add(serviceId);
+      }
+      return newSelection;
+    });
   };
 
-  const handlePlanChange = (planId: string) => {
-    const plan = selectedService?.plans.find(p => p.id === planId);
-    if (plan) {
-      setSelectedPlan(plan);
-      const addonPrice = selectedAddons.reduce((sum, addon) => sum + addon.price, 0);
-      setTotalPrice(plan.price + addonPrice);
+  const matchedOffer = useMemo((): OfferGroup | null => {
+    if (selectedServices.size === 0) return null;
+
+    const selectedIds = Array.from(selectedServices);
+
+    let bestMatch: OfferGroup | null = null;
+    let maxMatchingServices = 0;
+
+    for (const offer of offerGroups) {
+      const offerServiceIds = new Set(offer.services);
+      const matchingServices = selectedIds.filter(id => offerServiceIds.has(id));
+
+      if (
+        matchingServices.length === selectedIds.size && // All selected services are in the offer
+        offerServiceIds.size >= selectedIds.size // The offer can contain more services, but not less
+      ) {
+        if (!bestMatch || offerServiceIds.size < new Set(bestMatch.services).size) {
+          bestMatch = offer;
+        }
+      }
     }
-  };
 
-  const handleAddonToggle = (addon: Addon) => {
-    const isSelected = selectedAddons.some(a => a.id === addon.id);
-    let newAddons: Addon[];
-    if (isSelected) {
-      newAddons = selectedAddons.filter(a => a.id !== addon.id);
-    } else {
-      newAddons = [...selectedAddons, addon];
+    // A less-perfect match finding. If no perfect match found.
+    if (!bestMatch) {
+       for (const offer of offerGroups) {
+         const offerServiceIds = new Set(offer.services);
+         const matchingServices = selectedIds.filter(id => offerServiceIds.has(id));
+
+         if (matchingServices.length > maxMatchingServices) {
+           maxMatchingServices = matchingServices.length;
+           bestMatch = offer;
+         } else if (matchingServices.length === maxMatchingServices && bestMatch) {
+            if (offer.sellingPrice < bestMatch.sellingPrice) {
+                bestMatch = offer;
+            }
+         }
+       }
     }
-    setSelectedAddons(newAddons);
-    const addonPrice = newAddons.reduce((sum, a) => sum + a.price, 0);
-    setTotalPrice((selectedPlan?.price || 0) + addonPrice);
-  };
+
+
+    return bestMatch;
+  }, [selectedServices]);
+
+  const totalIndividualPrice = useMemo(() => {
+    return Array.from(selectedServices).reduce((total, serviceId) => {
+      const service = subscriptionServices.find(s => s.id === serviceId);
+      const plan = service?.plans[0];
+      return total + (plan?.price || 0);
+    }, 0);
+  }, [selectedServices]);
+
 
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold font-headline">Explore Subscriptions</h1>
-        <p className="text-muted-foreground">Find and customize the perfect plans for you.</p>
+        <h1 className="text-3xl font-bold font-headline">Build Your Own Bundle</h1>
+        <p className="text-muted-foreground">Select the services you want and we'll find the best deal for you.</p>
       </div>
-      <div className="grid grid-cols-1 gap-6">
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {subscriptionServices.map((service) => (
-          <SubscriptionCard key={service.id} service={service} onCustomizeClick={handleCustomizeClick} />
+          <Label
+            key={service.id}
+            htmlFor={service.id}
+            className={`relative flex flex-col items-center justify-center p-3 border rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/50 ${
+              selectedServices.has(service.id) ? 'border-primary shadow-lg scale-105' : 'border-border'
+            }`}
+          >
+            <service.logo className="w-12 h-12 mb-2" />
+            <span className="text-center text-xs font-medium">{service.name}</span>
+            <Checkbox
+              id={service.id}
+              checked={selectedServices.has(service.id)}
+              onCheckedChange={() => handleServiceToggle(service.id)}
+              className="absolute top-2 right-2"
+            />
+          </Label>
         ))}
       </div>
 
-      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent className="w-full p-0 flex flex-col">
-          {selectedService && (
-            <>
-              <SheetHeader className="p-6">
-                <SheetTitle className="text-2xl font-headline">Customize {selectedService.name}</SheetTitle>
-                <SheetDescription>
-                  Tailor your plan to your needs. Your changes will be reflected in the total price.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="flex-grow overflow-y-auto px-6 space-y-6">
+      <Separator />
+
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold font-headline">Your Custom Package</h2>
+        {selectedServices.size > 0 ? (
+           <Card className="shadow-lg">
+             <CardHeader>
+               <CardTitle>Summary</CardTitle>
+             </CardHeader>
+             <CardContent className="space-y-6">
+              {matchedOffer ? (
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Choose a Base Plan</h3>
-                  <RadioGroup value={selectedPlan?.id} onValueChange={handlePlanChange}>
-                    {selectedService.plans.map(plan => (
-                      <Label key={plan.id} htmlFor={plan.id} className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-muted/50 has-[[data-state=checked]]:border-primary">
-                        <div className="space-y-1">
-                          <span className="font-semibold">{plan.name}</span>
-                          <span className="text-sm text-muted-foreground">THB {plan.price.toFixed(2)}/month</span>
-                        </div>
-                        <RadioGroupItem value={plan.id} id={plan.id} />
-                      </Label>
-                    ))}
-                  </RadioGroup>
+                  <h3 className="text-lg font-semibold text-primary mb-2 flex items-center gap-2">
+                    <Package className="w-5 h-5" />
+                    Best Deal Found: {matchedOffer.packName}
+                  </h3>
+                  <OfferCard offer={matchedOffer} allServices={subscriptionServices} highlight={selectedServices} />
                 </div>
-                {selectedService.addons.length > 0 && (
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Available Add-ons</h3>
-                    <div className="space-y-4">
-                      {selectedService.addons.map(addon => (
-                        <div key={addon.id} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="space-y-1">
-                            <Label htmlFor={addon.id} className="font-semibold cursor-pointer">{addon.name}</Label>
-                            <p className="text-sm text-muted-foreground">{addon.description}</p>
-                            <p className="text-sm font-medium text-primary">+THB {addon.price.toFixed(2)}/month</p>
-                          </div>
-                          <Checkbox
-                            id={addon.id}
-                            checked={selectedAddons.some(a => a.id === addon.id)}
-                            onCheckedChange={() => handleAddonToggle(addon)}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <SheetFooter className="p-6 mt-auto bg-card border-t">
-                <div className="w-full space-y-4">
-                  <Separator />
-                  <div className="flex justify-between items-center text-xl font-bold">
-                    <span>Total:</span>
-                    <span>THB {totalPrice.toFixed(2)}<span className="text-base font-normal text-muted-foreground">/month</span></span>
-                  </div>
-                  <Button size="lg" className="w-full">Add to Cart</Button>
+              ) : (
+                 <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-2">No special bundle available for your selection.</p>
+                  <p className="text-2xl font-bold">
+                    Total: THB {totalIndividualPrice.toFixed(2)}
+                    <span className="text-base font-normal text-muted-foreground">/month</span>
+                  </p>
                 </div>
-              </SheetFooter>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
+              )}
+               <Button size="lg" className="w-full group">
+                  Proceed to Checkout
+                  <ArrowRight className="ml-2 h-5 w-5 transform group-hover:translate-x-1 transition-transform" />
+                </Button>
+             </CardContent>
+           </Card>
+        ) : (
+          <div className="text-center py-12 text-muted-foreground">
+            <p>Select services above to create your package.</p>
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }
