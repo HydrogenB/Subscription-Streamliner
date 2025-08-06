@@ -2,7 +2,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { subscriptionServices, offerGroups } from '@/lib/data';
@@ -20,6 +20,7 @@ import { TrueIDIcon } from '@/components/icons/trueid-icon';
 import { Card } from '@/components/ui/card';
 import { OfferCard } from '@/components/subscriptions/offer-card';
 import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel';
+import Autoplay from "embla-carousel-autoplay"
 
 const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: string }> = {
   youtube: { Icon: YouTubeIcon, title: 'Youtube Premium' },
@@ -42,31 +43,40 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
   
     const selectedArray = Array.from(selectedIds).sort();
     let bestOffer: OfferGroup | null = null;
+    let bestMatchLength = 0;
   
-    // Exact match has highest priority
     for (const offer of offerGroups) {
       const offerServicesSorted = [...offer.services].sort();
-      if (offerServicesSorted.length === selectedArray.length && 
-          offerServicesSorted.every((id, index) => id === selectedArray[index])) {
+      const isExactMatch = offerServicesSorted.length === selectedArray.length && 
+          offerServicesSorted.every((id, index) => id === selectedArray[index]);
+
+      if (isExactMatch) {
+        // Prioritize exact matches
         if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice) {
           bestOffer = offer;
+          bestMatchLength = offerServicesSorted.length;
+        }
+      } else if (selectedArray.every(id => offerServicesSorted.includes(id))) {
+        // This is a superset offer, consider if it's better
+        if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice) {
+           bestOffer = offer;
+           bestMatchLength = offerServicesSorted.length;
         }
       }
     }
 
-    if(bestOffer) return bestOffer;
-
-    // Find best offer for subsets if no exact match
-    for (const offer of offerGroups) {
+    // Now check for subset offers if no exact or superset match is best
+    if (!bestOffer || bestMatchLength < selectedArray.length) {
+      for (const offer of offerGroups) {
         const offerServicesSorted = [...offer.services].sort();
-        const isSubset = offerServicesSorted.every(id => selectedArray.includes(id));
-  
-        if (isSubset) {
-           if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice) {
+        if (offerServicesSorted.every(id => selectedArray.includes(id))) {
+           if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice || offer.services.length > bestMatchLength) {
               bestOffer = offer;
+              bestMatchLength = offer.services.length;
             }
         }
       }
+    }
 
     return bestOffer;
 }
@@ -140,6 +150,10 @@ export default function AddBundlePage() {
     router.push(`/subscriptions/confirm?services=${serviceIds}`);
   };
 
+  const plugin = useRef(
+    Autoplay({ delay: 3000, stopOnInteraction: true })
+  );
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
       <Header showBackButton title="Add bundle" />
@@ -151,10 +165,14 @@ export default function AddBundlePage() {
               <h2 className="text-xl font-bold text-center">Hero Bundles</h2>
               <p className="text-muted-foreground text-center mb-4">Our most popular bundles with great savings.</p>
               <Carousel
+                plugins={[plugin.current]}
                 opts={{
                     align: "start",
+                    loop: true,
                 }}
                 className="w-full max-w-sm mx-auto"
+                onMouseEnter={plugin.current.stop}
+                onMouseLeave={plugin.current.reset}
               >
                   <CarouselContent>
                       {heroBundles.map((bundle) => (
@@ -335,9 +353,8 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
                 </div>
             );
         }
-
-        const currentTotal = calculateTotalPrice(selectedServices);
         
+        const currentTotal = calculateTotalPrice(selectedServices);
         let incrementalCost: number;
         
         if (isNetflixService && selectedNetflixPlan) {
@@ -345,30 +362,32 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
             tempSelection.delete(selectedNetflixPlan);
             tempSelection.add(service.id as ServiceId);
             const newTotal = calculateTotalPrice(tempSelection);
-            
-            const selectionWithoutAnyNetflix = new Set(selectedServices);
-            selectionWithoutAnyNetflix.delete(selectedNetflixPlan);
-            const priceWithoutAnyNetflix = calculateTotalPrice(selectionWithoutAnyNetflix);
-            
-            const potentialSelectionWithNewNetflix = new Set(selectionWithoutAnyNetflix);
-            potentialSelectionWithNewNetflix.add(service.id as ServiceId);
-            const priceWithNewNetflix = calculateTotalPrice(potentialSelectionWithNewNetflix);
-
-            incrementalCost = priceWithNewNetflix - priceWithoutAnyNetflix;
+            incrementalCost = newTotal - calculateTotalPrice(new Set([...selectedServices].filter(id => id !== selectedNetflixPlan)));
         } else {
             const potentialSelection = new Set(selectedServices);
             potentialSelection.add(service.id as ServiceId);
             const newTotal = calculateTotalPrice(potentialSelection);
             incrementalCost = newTotal - currentTotal;
         }
-        
-        const sign = incrementalCost < 0 ? '' : '+';
+
+        const sign = incrementalCost < 0 ? "-" : "+";
         const displayCost = Math.abs(incrementalCost);
 
+        if (incrementalCost < 0) {
+            return (
+                <div className="text-right">
+                    <p className="font-bold text-lg text-green-600">
+                      ({incrementalCost.toFixed(0)}) THB
+                    </p>
+                    <p className="text-xs text-muted-foreground line-through">{service.plans[0].price.toFixed(0)} THB</p>
+                </div>
+            )
+        }
+        
         return (
             <div className="text-right">
                 <p className={cn("font-bold text-lg", incrementalCost >= 0 ? "text-primary" : "text-green-600")}>
-                  {sign}{incrementalCost.toFixed(0)} THB
+                  {sign}{displayCost.toFixed(0)} THB
                 </p>
                 <p className="text-xs text-muted-foreground line-through">{service.plans[0].price.toFixed(0)} THB</p>
             </div>
