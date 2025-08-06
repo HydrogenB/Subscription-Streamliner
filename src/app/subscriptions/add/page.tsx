@@ -6,7 +6,7 @@ import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { SubscriptionService } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Globe, Tv } from 'lucide-react';
+import { Globe, Tv, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GiftIcon } from '@/components/icons/gift-icon';
 import { NetflixIcon } from '@/components/icons/netflix-icon';
@@ -51,7 +51,6 @@ function findBestOffer(selectedIds: Set<ServiceId>) {
     }
     const selectedArray = Array.from(selectedIds).sort();
 
-    // Find all matching offers
     const matchedOffers = offerGroups.filter(offer => {
       if (offer.services.length !== selectedArray.length) {
         return false;
@@ -60,7 +59,6 @@ function findBestOffer(selectedIds: Set<ServiceId>) {
       return JSON.stringify(offerServicesSorted) === JSON.stringify(selectedArray);
     });
 
-    // Return the one with the lowest selling price
     if (matchedOffers.length > 0) {
         return matchedOffers.reduce((best, current) => 
             current.sellingPrice < best.sellingPrice ? current : best
@@ -69,38 +67,55 @@ function findBestOffer(selectedIds: Set<ServiceId>) {
     return null;
 }
 
+const NETFLIX_PLANS: ServiceId[] = ['netflix-mobile', 'netflix-basic', 'netflix-standard', 'netflix-premium'];
+
 export default function AddBundlePage() {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set());
 
   const handleServiceToggle = (serviceId: ServiceId) => {
     setSelectedServices(prev => {
       const newSelection = new Set(prev);
+      
       if (newSelection.has(serviceId)) {
         newSelection.delete(serviceId);
       } else {
         newSelection.add(serviceId);
+        // If the added service is a Netflix plan, remove other Netflix plans
+        if (NETFLIX_PLANS.includes(serviceId)) {
+          for (const plan of NETFLIX_PLANS) {
+            if (plan !== serviceId) {
+              newSelection.delete(plan);
+            }
+          }
+        }
       }
       return newSelection;
     });
   };
 
-  const { total, savings, packName, currentOffer } = useMemo(() => {
+  const { total, savings, packName, isValidBundle } = useMemo(() => {
     const matchedOffer = findBestOffer(selectedServices);
 
     if (matchedOffer) {
       const savings = matchedOffer.fullPrice - matchedOffer.sellingPrice;
-      return { total: matchedOffer.sellingPrice, savings, packName: matchedOffer.packName, currentOffer: matchedOffer };
-    }
-
-    if (selectedServices.size > 0) {
-        const individualTotal = Array.from(selectedServices).reduce((acc, s) => {
-            const service = subscriptionServices.find(sub => sub.id === s);
-            return acc + (service?.plans[0]?.price || 0);
-        }, 0);
-        return { total: individualTotal, savings: 0, packName: "Custom Bundle", currentOffer: null };
+      return { total: matchedOffer.sellingPrice, savings, packName: matchedOffer.packName, isValidBundle: true };
     }
     
-    return { total: 0, savings: 0, packName: "Choose your bundle", currentOffer: null };
+    // For single selections that have a standalone offer
+    if (selectedServices.size === 1) {
+      const singleServiceId = Array.from(selectedServices)[0];
+      const service = subscriptionServices.find(s => s.id === singleServiceId);
+      if (service) {
+         return { total: service.plans[0].price, savings: 0, packName: service.name, isValidBundle: true };
+      }
+    }
+    
+    // If no valid bundle, but items are selected
+    if (selectedServices.size > 0) {
+        return { total: 0, savings: 0, packName: "Invalid Bundle Combination", isValidBundle: false };
+    }
+
+    return { total: 0, savings: 0, packName: "Choose your bundle", isValidBundle: false };
   }, [selectedServices]);
 
   const allServices = subscriptionServices;
@@ -109,19 +124,27 @@ export default function AddBundlePage() {
     const service = subscriptionServices.find(s => s.id === serviceId);
     if (!service) return { text: '', isIncremental: false };
 
-    // If the service is selected, don't show price info
     if (selectedServices.has(serviceId)) {
       return { text: '', isIncremental: false };
     }
-
-    // If nothing is selected yet, show the full price
+    
     if (selectedServices.size === 0) {
         return { text: `${service.plans[0].price} THB`, isIncremental: false };
     }
 
-    // Calculate potential next bundle
+    if (!isValidBundle) {
+        return { text: ``, isIncremental: false };
+    }
+
     const potentialSelection = new Set(selectedServices);
     potentialSelection.add(serviceId);
+
+    // Conflict handling for Netflix
+    const selectedNetflix = NETFLIX_PLANS.find(p => selectedServices.has(p));
+    if (selectedNetflix && NETFLIX_PLANS.includes(serviceId) && selectedNetflix !== serviceId) {
+       potentialSelection.delete(selectedNetflix);
+    }
+
     const nextOffer = findBestOffer(potentialSelection);
     
     if (nextOffer) {
@@ -129,19 +152,33 @@ export default function AddBundlePage() {
         return { text: `+${increment.toFixed(0)} THB`, isIncremental: true };
     }
 
-    // Default to adding the service's individual price
-    return { text: `+${service.plans[0].price} THB`, isIncremental: true };
+    return { text: '', isIncremental: false };
   };
+
+  const isNetflixConflict = (serviceId: ServiceId): boolean => {
+    if (!NETFLIX_PLANS.includes(serviceId)) {
+      return false;
+    }
+    const selectedNetflixPlan = NETFLIX_PLANS.find(plan => selectedServices.has(plan));
+    return !!selectedNetflixPlan && selectedNetflixPlan !== serviceId;
+  }
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Header showBackButton title="Add bundle" />
       <div className="p-4 space-y-4 flex-grow overflow-y-auto">
         <h2 className="text-xl font-bold">{packName}</h2>
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700">
-          <GiftIcon className="w-5 h-5 text-indigo-500" />
-          <span>Select your favorite services to see bundle deals!</span>
-        </div>
+        { !isValidBundle && selectedServices.size > 0 ? (
+          <div className="bg-destructive/10 border-l-4 border-destructive text-destructive-foreground p-3 rounded-lg flex items-center gap-3 text-sm">
+            <AlertCircle className="w-5 h-5" />
+            <span>This combination is not available as a bundle. Please adjust your selection.</span>
+          </div>
+        ) : (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700">
+            <GiftIcon className="w-5 h-5 text-indigo-500" />
+            <span>Select your favorite services to see bundle deals!</span>
+          </div>
+        )}
 
         <div className="space-y-3">
           {allServices.map(service => (
@@ -153,6 +190,7 @@ export default function AddBundlePage() {
               isSelected={selectedServices.has(service.id as ServiceId)}
               onToggle={() => handleServiceToggle(service.id as ServiceId)}
               priceInfo={getPriceInfo(service.id as ServiceId)}
+              isConflicting={isNetflixConflict(service.id as ServiceId)}
             />
           ))}
         </div>
@@ -161,11 +199,11 @@ export default function AddBundlePage() {
         <div className="flex justify-between items-center mb-2">
             <span className="text-muted-foreground">Total price</span>
             <div>
-                {savings > 0 && <span className="text-sm text-muted-foreground line-through mr-2">THB {(total + savings).toFixed(2)}</span>}
-                <span className="font-bold text-xl">THB {total.toFixed(2)}</span>
+                {savings > 0 && isValidBundle && <span className="text-sm text-muted-foreground line-through mr-2">THB {(total + savings).toFixed(2)}</span>}
+                <span className="font-bold text-xl">THB {isValidBundle ? total.toFixed(2) : '0.00'}</span>
             </div>
         </div>
-        <Button size="lg" className="w-full" disabled={selectedServices.size === 0}>
+        <Button size="lg" className="w-full" disabled={!isValidBundle || selectedServices.size === 0}>
           Confirm bundle
         </Button>
       </div>
@@ -180,22 +218,35 @@ interface ServiceCardProps {
   isSelected: boolean;
   onToggle: () => void;
   priceInfo: { text: string; isIncremental: boolean };
+  isConflicting: boolean;
 }
 
-function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo }: ServiceCardProps) {
+function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, isConflicting }: ServiceCardProps) {
+  const isDisabled = isConflicting;
+  
   return (
     <div
-      onClick={onToggle}
+      onClick={!isDisabled ? onToggle : undefined}
       className={cn(
-        'p-4 rounded-xl border-2 bg-white transition-all cursor-pointer',
-        isSelected ? 'border-red-500 bg-red-50' : 'border-gray-200'
+        'p-4 rounded-xl border-2 bg-white transition-all',
+        isSelected ? 'border-red-500 bg-red-50' : 'border-gray-200',
+        isDisabled ? 'bg-gray-200 border-gray-300 cursor-not-allowed opacity-60' : 'cursor-pointer'
       )}
     >
       <div className="flex items-start gap-3">
-        <Checkbox checked={isSelected} className={cn("w-5 h-5 mt-1", isSelected && "data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500")} />
+        <Checkbox 
+          checked={isSelected}
+          disabled={isDisabled}
+          className={cn(
+            "w-5 h-5 mt-1", 
+            isSelected && "data-[state=checked]:bg-red-500 data-[state=checked]:border-red-500",
+            isDisabled && "data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-500"
+          )} 
+        />
         <Icon className={cn("w-8 h-8", service.id.startsWith('netflix') && 'w-6 h-10', service.id === 'youtube' && 'w-10 h-8')} />
         <div className="flex-grow">
-          <span className="font-bold">{title}</span>
+          <span className={cn("font-bold", isDisabled && "text-gray-500")}>{title}</span>
+           {isConflicting && <p className="text-xs text-destructive mt-1">Only one Netflix plan allowed.</p>}
           {isSelected && service.plans[0].features.length > 0 && (
             <div className="mt-3 space-y-1 text-gray-600 text-sm">
                 {service.plans[0].features.map((feature, index) => (
