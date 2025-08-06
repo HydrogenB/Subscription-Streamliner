@@ -135,11 +135,16 @@ export default function AddBundlePage() {
       return { text: '', isIncremental: false };
     }
   
-    if (selectedServices.size === 0) {
-      const singleOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
-      return { text: `${singleOffer?.sellingPrice || service.plans[0].price} THB`, isIncremental: false };
+    const baseSelectionForOffer = new Set(selectedServices);
+    if(baseSelectionForOffer.size === 0) {
+        const singleServiceSelection = new Set([serviceId]);
+        const singleOffer = findBestOffer(singleServiceSelection);
+        if(singleOffer) {
+            return { text: `${singleOffer.sellingPrice} THB`, isIncremental: false };
+        }
     }
-  
+
+
     if (selectedServices.size >= MAX_SELECTION_LIMIT) {
         return { text: '', isIncremental: false };
     }
@@ -234,7 +239,7 @@ export default function AddBundlePage() {
   const maxSavings = Math.max(...offerGroups.filter(o => o.services.length === 4).map(o => o.fullPrice - o.sellingPrice));
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 pb-safe-bottom">
+    <div className="flex flex-col h-screen bg-gray-50">
       <Header showBackButton title="Add bundle" />
       <main className="flex-grow overflow-y-auto pb-48">
         <div className="p-4 space-y-4">
@@ -265,21 +270,18 @@ export default function AddBundlePage() {
         </div>
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-10 pb-safe-bottom">
-        <div className="relative">
-          <button 
+      <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-10">
+        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out pb-safe-bottom")}>
+          
+          <div 
+            className="p-4 cursor-pointer border-b flex justify-between items-center" 
             onClick={() => setIsSummaryOpen(prev => !prev)}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center border"
           >
-            {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-red-500" /> : <ChevronUp className="w-5 h-5 text-red-500" />}
-          </button>
-        </div>
-        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-transform duration-300 ease-in-out", isSummaryOpen ? "translate-y-0" : "translate-y-[calc(100%-250px)]")}>
-          <div className="p-4 cursor-pointer border-b" onClick={() => setIsSummaryOpen(prev => !prev)}>
-            <div className="flex justify-between items-center">
-               <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
+             <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
+             <div className="flex items-center gap-2">
                <span className="text-sm font-mono text-muted-foreground">{isValidBundle ? packName : ''}</span>
-            </div>
+               {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-gray-500" /> : <ChevronUp className="w-5 h-5 text-gray-500" />}
+             </div>
           </div>
 
           <div className={cn("px-4 pt-4 space-y-4 overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
@@ -331,7 +333,7 @@ export default function AddBundlePage() {
             )}
           </div>
           
-          <div className="px-4 pb-4 pt-4 space-y-3 bg-white">
+          <div className="px-4 pb-4 pt-4 space-y-3 bg-white rounded-b-2xl">
               { !isValidBundle && selectedServices.size > 0 && (
                 <div className="bg-red-50 border-l-4 border-red-500 text-red-800 p-3 rounded-lg flex items-center gap-3 text-sm">
                   <AlertCircle className="w-5 h-5" />
