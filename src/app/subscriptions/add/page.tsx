@@ -202,34 +202,36 @@ export default function AddBundlePage() {
   return (
     <div className="flex flex-col h-screen bg-gray-50">
       <Header showBackButton title="Add bundle" />
-      <div className="p-4 space-y-4 flex-grow overflow-y-auto pb-48">
-        
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700">
-          <GiftIcon className="w-5 h-5 text-indigo-500" />
-          <span>Select your favorite services to see bundle deals!</span>
-        </div>
+      <main className="flex-grow overflow-y-auto pb-48">
+        <div className="p-4 space-y-4">
+          
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 rounded-lg flex items-center gap-3 text-sm text-gray-700">
+            <GiftIcon className="w-5 h-5 text-indigo-500" />
+            <span>Select your favorite services to see bundle deals!</span>
+          </div>
 
-        <div className="space-y-3">
-          {allServices.map(service => (
-            <ServiceCard 
-              key={service.id}
-              service={service}
-              Icon={serviceDisplayConfig[service.id as ServiceId].Icon}
-              title={serviceDisplayConfig[service.id as ServiceId].title}
-              isSelected={selectedServices.has(service.id as ServiceId)}
-              onToggle={() => handleServiceToggle(service.id as ServiceId)}
-              priceInfo={getPriceInfo(service.id as ServiceId)}
-              isConflicting={isNetflixConflict(service.id as ServiceId)}
-              isDisabled={
-                  !selectedServices.has(service.id as ServiceId) &&
-                  selectedServices.size >= MAX_SELECTION_LIMIT
-              }
-            />
-          ))}
+          <div className="space-y-3">
+            {allServices.map(service => (
+              <ServiceCard 
+                key={service.id}
+                service={service}
+                Icon={serviceDisplayConfig[service.id as ServiceId].Icon}
+                title={serviceDisplayConfig[service.id as ServiceId].title}
+                isSelected={selectedServices.has(service.id as ServiceId)}
+                onToggle={() => handleServiceToggle(service.id as ServiceId)}
+                priceInfo={getPriceInfo(service.id as ServiceId)}
+                isConflicting={isNetflixConflict(service.id as ServiceId)}
+                isDisabled={
+                    !selectedServices.has(service.id as ServiceId) &&
+                    selectedServices.size >= MAX_SELECTION_LIMIT
+                }
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      </main>
 
-      <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-10">
+      <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-10">
         <div className="relative">
           <button 
             onClick={() => setIsSummaryOpen(!isSummaryOpen)}
@@ -316,7 +318,7 @@ export default function AddBundlePage() {
               </Button>
             </div>
         </div>
-      </div>
+      </footer>
 
     </div>
   );
