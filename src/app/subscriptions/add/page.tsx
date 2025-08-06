@@ -8,7 +8,7 @@ import { Header } from '@/components/layout/header';
 import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { SubscriptionService, OfferGroup, ServiceId } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Gift, ChevronUp, AlertCircle, Sparkles, Check } from 'lucide-react';
+import { ChevronUp, AlertCircle, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NetflixIcon } from '@/components/icons/netflix-icon';
 import { YouTubeIcon } from '@/components/icons/youtube-icon';
@@ -18,7 +18,6 @@ import { WeTVIcon } from '@/components/icons/wetv-icon';
 import { OneDIcon } from '@/components/icons/oned-icon';
 import { TrueIDIcon } from '@/components/icons/trueid-icon';
 import { Card } from '@/components/ui/card';
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { OfferCard } from '@/components/subscriptions/offer-card';
 
 const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: string }> = {
@@ -76,7 +75,7 @@ function findNextBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
 
     const potentialOffers = offerGroups.filter(offer => {
         if (offer.services.length <= selectedIds.size) return false;
-        if (offer.packName === 'Pack0') return false; // Exclude standalone offers
+        if (offer.packName === 'Pack0') return false; 
         const selectedIdArray = Array.from(selectedIds);
         return selectedIdArray.every(id => offer.services.includes(id));
     });
@@ -96,7 +95,7 @@ const NETFLIX_PLANS: ServiceId[] = ['netflix-mobile', 'netflix-basic', 'netflix-
 const MAX_SELECTION_LIMIT = 4;
 
 const allServices = subscriptionServices;
-const curatedOffers = offerGroups.filter(o => o.services.length > 1 && o.packName !== 'Pack0').slice(0, 10);
+const heroBundle = offerGroups.find(o => o.id === 'offerGroup12');
 
 export default function AddBundlePage() {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set([]));
@@ -168,19 +167,15 @@ export default function AddBundlePage() {
         <div className="p-4 space-y-6">
           
           <div>
-            <h2 className="text-2xl font-bold text-center">Find Your Perfect Bundle</h2>
-            <p className="text-muted-foreground text-center mb-4">Save more with our curated bundles or build your own.</p>
-            <Carousel opts={{ align: "start", loop: true }} className="w-full">
-              <CarouselContent className="-ml-2">
-                {curatedOffers.map((offer) => (
-                  <CarouselItem key={offer.id} className="pl-2 basis-4/5 md:basis-1/2">
-                    <OfferCard offer={offer} allServices={allServices} onSelect={() => setSelectedServices(new Set(offer.services as ServiceId[]))} />
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              <CarouselPrevious className="hidden md:flex" />
-              <CarouselNext className="hidden md:flex" />
-            </Carousel>
+            <h2 className="text-2xl font-bold text-center">Hero Bundle</h2>
+            <p className="text-muted-foreground text-center mb-4">Our most popular bundle with great savings.</p>
+            {heroBundle && (
+              <OfferCard 
+                offer={heroBundle} 
+                allServices={allServices} 
+                onSelect={() => setSelectedServices(new Set(heroBundle.services as ServiceId[]))} 
+              />
+            )}
           </div>
           
           <div>
@@ -351,7 +346,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
             if (standaloneOffer && standaloneOffer.sellingPrice < originalPrice) {
                 return (
                     <div className="text-right">
-                        <p className="font-bold text-red-600 text-lg">{standaloneOffer.sellingPrice.toFixed(0)} THB</p>
+                        <p className="font-bold text-primary text-lg">{standaloneOffer.sellingPrice.toFixed(0)} THB</p>
                         <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
                     </div>
                 );
@@ -369,42 +364,54 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
         
         const tempSelection = new Set(selectedServices);
         tempSelection.add(service.id as ServiceId);
-        const nextOffer = findBestOffer(tempSelection);
+        
+        const currentTotalOffer = findBestOffer(selectedServices);
+        const currentTotal = currentTotalOffer ? currentTotalOffer.sellingPrice : Array.from(selectedServices).reduce((acc, id) => {
+            const s = subscriptionServices.find(s => s.id === id);
+            return acc + (s?.plans[0].price || 0);
+        }, 0);
 
-        const currentTotal = findBestOffer(selectedServices)?.sellingPrice ?? Array.from(selectedServices).reduce((acc, id) => acc + (subscriptionServices.find(s => s.id === id)?.plans[0].price ?? 0), 0);
+        const nextOffer = findBestOffer(tempSelection);
 
         if (nextOffer) {
             const addedCost = nextOffer.sellingPrice - currentTotal;
-            return <p className="font-bold text-green-600 text-lg">+{addedCost.toFixed(0)} THB</p>;
+            return (
+                <div className="text-right">
+                    <p className="font-bold text-green-600 text-lg">+{addedCost.toFixed(0)} THB</p>
+                    <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
+                </div>
+            );
         }
         
-        if (standaloneOffer) {
-            return <p className="font-bold text-primary text-lg">+{standaloneOffer.sellingPrice.toFixed(0)} THB</p>;
-        }
+        const addPrice = standaloneOffer ? standaloneOffer.sellingPrice : originalPrice;
 
-        return <p className="font-bold text-primary text-lg">+{originalPrice.toFixed(0)} THB</p>;
+        return (
+             <div className="text-right">
+                <p className="font-bold text-destructive text-lg">+{addPrice.toFixed(0)} THB</p>
+                 <p className="text-xs text-muted-foreground">{originalPrice.toFixed(0)} THB</p>
+            </div>
+        )
     }
   
   return (
     <div
       onClick={!isDisabled ? onToggle : undefined}
       className={cn(
-        'p-3 rounded-xl border-2 bg-white dark:bg-gray-800 transition-all flex items-center gap-4',
+        'p-3 rounded-xl border-2 bg-white dark:bg-gray-800 transition-all flex items-center gap-4 relative',
         isSelected ? 'border-primary shadow-lg' : 'border-gray-200 dark:border-gray-700',
         isDisabled ? 'bg-gray-100 dark:bg-gray-700/50 border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-60' : 'cursor-pointer'
       )}
     >
-        <div className={cn("w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0", isSelected ? "bg-primary border-primary" : "border-gray-300")}>
+        <div className={cn("w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0", isSelected ? "bg-primary border-primary" : "border-gray-300 dark:border-gray-600")}>
             {isSelected && <Check className="w-4 h-4 text-white" />}
         </div>
 
         <Icon 
           className={cn("w-10 h-10 object-contain shrink-0", service.id.startsWith('netflix') && 'w-7 h-10')} 
-          serviceId={service.id}
         />
         <div className="flex-grow min-w-0">
           <p className={cn("font-bold text-base text-gray-800 dark:text-gray-200")}>{title}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{service.plans[0].features.join(' • ')}</p>
+          {isSelected && <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{service.plans[0].features.join(' • ')}</p>}
         </div>
         <div className="ml-auto text-right">
             {getPriceInfo()}
