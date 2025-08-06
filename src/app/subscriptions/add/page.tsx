@@ -332,7 +332,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
             incrementalCost = newTotal - currentTotal;
         }
         
-        const sign = incrementalCost >= 0 ? '+' : '+-';
+        const sign = incrementalCost >= 0 ? '+' : '-';
         const displayCost = Math.abs(incrementalCost);
 
         return (
