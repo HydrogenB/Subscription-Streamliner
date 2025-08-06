@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -196,7 +197,7 @@ export default function AddBundlePage() {
     return !!selectedNetflixPlan && selectedNetflixPlan !== serviceId;
   }
   
-  const maxSavings = Math.max(...offerGroups.filter(o => o.services.length > 1).map(o => o.fullPrice - o.sellingPrice));
+  const maxSavings = Math.max(...offerGroups.filter(o => o.services.length === 4).map(o => o.fullPrice - o.sellingPrice));
 
   return (
     <div className="flex flex-col h-screen bg-gray-50">
@@ -246,15 +247,15 @@ export default function AddBundlePage() {
           </div>
           <div className={cn("px-4 pb-4 space-y-4 transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
             
-            { isValidBundle && savings > 0 ? (
+            { savings > 0 ? (
               <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold text-center">
                 ส่วนลดสูงสุด {savings.toFixed(0)} บาท เมื่อเลือกสูงสุด {selectedServices.size} แอป
               </div>
-            ) : selectedServices.size === 0 ? (
+            ) : (
               <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold text-center">
                 ส่วนลดสูงสุด {maxSavings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป
               </div>
-            ) : null}
+            )}
             
             {selectedServices.size > 0 && (
               <div className="space-y-3 pt-2">
