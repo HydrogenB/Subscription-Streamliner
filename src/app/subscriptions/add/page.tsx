@@ -130,10 +130,10 @@ export default function AddBundlePage() {
   const getPriceInfo = (serviceId: ServiceId): { text: string; originalPrice?: string; isIncremental: boolean } => {
     const service = subscriptionServices.find(s => s.id === serviceId);
     if (!service) return { text: '', isIncremental: false };
-
+  
     const standaloneOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
     const standalonePrice = standaloneOffer?.sellingPrice || service.plans[0].price;
-
+  
     if (selectedServices.has(serviceId)) {
       return { text: '', isIncremental: false };
     }
@@ -141,44 +141,45 @@ export default function AddBundlePage() {
     if (selectedServices.size === 0) {
       return { text: `${standalonePrice.toFixed(0)} THB`, isIncremental: false };
     }
-
+  
     if (selectedServices.size >= MAX_SELECTION_LIMIT) {
-        return { text: '', isIncremental: false };
-    }
-    
-    let baseSelection = new Set(selectedServices);
-    if (NETFLIX_PLANS.includes(serviceId)) {
-      NETFLIX_PLANS.forEach(plan => baseSelection.delete(plan));
+      return { text: '', isIncremental: false };
     }
   
-    const potentialSelection = new Set(baseSelection);
+    const potentialSelection = new Set(selectedServices);
+    if (NETFLIX_PLANS.includes(serviceId)) {
+      // Create a temporary selection without any existing netflix plan to test adding the new one
+      const tempSelection = new Set(selectedServices);
+      NETFLIX_PLANS.forEach(plan => tempSelection.delete(plan));
+      potentialSelection.clear();
+      tempSelection.forEach(item => potentialSelection.add(item));
+    }
     potentialSelection.add(serviceId);
   
     const nextOffer = findBestOffer(potentialSelection);
-    
+  
+    // Calculate current total price
+    const currentOffer = findBestOffer(selectedServices);
+    const currentTotal = currentOffer ? currentOffer.sellingPrice : Array.from(selectedServices).reduce((acc, id) => {
+      const s = subscriptionServices.find(s => s.id === id);
+      return acc + (s?.plans[0].price || 0);
+    }, 0);
+  
     if (nextOffer) {
-      const currentOffer = findBestOffer(selectedServices);
-      const currentTotal = currentOffer ? currentOffer.sellingPrice : Array.from(selectedServices).reduce((acc, id) => {
-        const s = subscriptionServices.find(s => s.id === id);
-        return acc + (s?.plans[0].price || 0);
-      }, 0);
-      
       const increment = nextOffer.sellingPrice - currentTotal;
-
+  
       const priceInfo: { text: string; originalPrice?: string; isIncremental: boolean } = {
-        text: `+${increment.toFixed(0)} THB`,
+        text: `+${Math.abs(increment).toFixed(0)} THB`,
         isIncremental: true,
       };
-
+  
       if (increment < standalonePrice) {
         priceInfo.originalPrice = `${standalonePrice.toFixed(0)} THB`;
       }
-      
       return priceInfo;
     } else {
       // If adding the service does not result in a valid bundle, show its full standalone price.
-      const servicePrice = service.plans[0].price;
-      return { text: `${servicePrice.toFixed(0)} THB`, isIncremental: false };
+      return { text: `${standalonePrice.toFixed(0)} THB`, isIncremental: false };
     }
   };
 
@@ -225,26 +226,27 @@ export default function AddBundlePage() {
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-10">
-        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out", isSummaryOpen ? "pb-safe-bottom" : "pb-0")}>
-          <div 
-            className="p-4 cursor-pointer border-b" 
+        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out pb-safe-bottom")}>
+           <div 
+            className="p-4 cursor-pointer" 
             onClick={() => setIsSummaryOpen(prev => !prev)}
-          >
-            <div className="flex justify-between items-center">
-               <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
-               <div className="flex items-center gap-2">
-                 {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-gray-500" /> : <ChevronUp className="w-5 h-5 text-gray-500" />}
-               </div>
-            </div>
-            {!isSummaryOpen && (
-              <div className="flex justify-between items-center mt-2">
-                  <span className="text-muted-foreground text-sm">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
-                  <span className="text-red-600 font-bold text-xl">{total.toFixed(0)} บาท</span>
-              </div>
-            )}
-          </div>
+           >
+             <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                   <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
+                   <div className="flex items-center gap-2">
+                     {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-gray-500" /> : <ChevronUp className="w-5 h-5 text-gray-500" />}
+                   </div>
+                </div>
+                {!isSummaryOpen && (
+                  <div className="flex items-baseline gap-2">
+                      <span className="text-red-600 font-bold text-xl">{total.toFixed(0)} บาท</span>
+                  </div>
+                )}
+             </div>
+           </div>
 
-          <div className={cn("px-4 pt-4 space-y-4 overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
+          <div className={cn("px-4 space-y-4 overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100 pt-4" : "max-h-0 opacity-0 pt-0")}>
             
             { savings > 0 ? (
               <div className="p-3 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold text-center">
@@ -293,14 +295,14 @@ export default function AddBundlePage() {
             )}
             
             { isSummaryOpen && (
-              <div className="flex justify-between items-center pt-4">
+              <div className="flex justify-between items-center pt-4 border-t mt-4">
                   <span className="text-muted-foreground">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
                   <span className="text-red-600 font-bold text-xl">{total.toFixed(0)} บาท</span>
               </div>
             )}
           </div>
           
-          <div className={cn("px-4 pb-4 pt-4 space-y-3 bg-white", isSummaryOpen && 'rounded-b-2xl', !isSummaryOpen && "pt-0")}>
+          <div className={cn("px-4 pb-4 space-y-3 bg-white", isSummaryOpen ? "pt-4" : "pt-2")}>
               { !isValidBundle && selectedServices.size > 0 && (
                 <div className="bg-red-50 border-l-4 border-red-500 text-red-800 p-3 rounded-lg flex items-center gap-3 text-sm">
                   <AlertCircle className="w-5 h-5" />
@@ -314,7 +316,7 @@ export default function AddBundlePage() {
                   ))}
               </div>
 
-              <Button size="lg" className="w-full bg-red-600 hover:bg-red-700 rounded-full pb-safe-bottom" disabled={!isValidBundle || selectedServices.size === 0}>
+              <Button size="lg" className="w-full bg-red-600 hover:bg-red-700 rounded-full" disabled={!isValidBundle || selectedServices.size === 0}>
                   ถัดไป
               </Button>
             </div>
