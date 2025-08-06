@@ -339,59 +339,71 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
     const isDisabled = (!isSelected && selectedServices.size >= MAX_SELECTION_LIMIT) || isNetflixConflict;
 
     const getPriceInfo = () => {
+      const originalPrice = service.plans[0].price;
+  
+      // Standalone price view (nothing selected yet)
+      if (selectedServices.size === 0) {
         const standaloneOffer = offerGroups.find(o => o.packName === 'Pack0' && o.services[0] === service.id);
-        const originalPrice = service.plans[0].price;
-
-        if (selectedServices.size === 0) {
-            if (standaloneOffer && standaloneOffer.sellingPrice < originalPrice) {
-                return (
-                    <div className="text-right">
-                        <p className="font-bold text-primary text-lg">{standaloneOffer.sellingPrice.toFixed(0)} THB</p>
-                        <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
-                    </div>
-                );
-            }
-            return <p className="font-bold text-primary text-lg">{originalPrice.toFixed(0)} THB</p>;
+        if (standaloneOffer && standaloneOffer.sellingPrice < originalPrice) {
+          return (
+            <div className="text-right">
+              <p className="font-bold text-primary text-lg">{standaloneOffer.sellingPrice.toFixed(0)} THB</p>
+              <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
+            </div>
+          );
         }
-
-        if (isSelected) {
-            return (
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                    <Check className="w-5 h-5 text-white" />
-                </div>
-            )
-        }
-        
-        const tempSelection = new Set(selectedServices);
-        tempSelection.add(service.id as ServiceId);
-        
-        const currentTotalOffer = findBestOffer(selectedServices);
-        const currentTotal = currentTotalOffer ? currentTotalOffer.sellingPrice : Array.from(selectedServices).reduce((acc, id) => {
-            const s = subscriptionServices.find(s => s.id === id);
+        return <p className="font-bold text-primary text-lg">{originalPrice.toFixed(0)} THB</p>;
+      }
+  
+      // If the card is for an already selected service
+      if (isSelected) {
+        return (
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+            <Check className="w-5 h-5 text-white" />
+          </div>
+        );
+      }
+      
+      // --- This is the core logic for incremental price calculation ---
+  
+      // 1. Calculate the current total price for the selected items
+      const currentOffer = findBestOffer(selectedServices);
+      const currentTotal = currentOffer 
+        ? currentOffer.sellingPrice 
+        : Array.from(selectedServices).reduce((acc, id) => {
+            const s = subscriptionServices.find(s_ => s_.id === id);
             return acc + (s?.plans[0].price || 0);
         }, 0);
-
-        const nextOffer = findBestOffer(tempSelection);
-
-        if (nextOffer) {
-            const addedCost = nextOffer.sellingPrice - currentTotal;
-            return (
-                <div className="text-right">
-                    <p className="font-bold text-green-600 text-lg">+{addedCost.toFixed(0)} THB</p>
-                    <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
-                </div>
-            );
-        }
-        
-        const addPrice = standaloneOffer ? standaloneOffer.sellingPrice : originalPrice;
-
-        return (
-             <div className="text-right">
-                <p className="font-bold text-destructive text-lg">+{addPrice.toFixed(0)} THB</p>
-                 <p className="text-xs text-muted-foreground">{originalPrice.toFixed(0)} THB</p>
-            </div>
-        )
-    }
+  
+      // 2. Calculate the potential new total if this service is added
+      const tempSelection = new Set(selectedServices);
+      if (NETFLIX_PLANS.includes(service.id as ServiceId)) {
+        NETFLIX_PLANS.forEach(plan => tempSelection.delete(plan));
+      }
+      tempSelection.add(service.id as ServiceId);
+  
+      const nextOffer = findBestOffer(tempSelection);
+      const nextTotal = nextOffer
+        ? nextOffer.sellingPrice
+        : Array.from(tempSelection).reduce((acc, id) => {
+            const s = subscriptionServices.find(s_ => s_.id === id);
+            return acc + (s?.plans[0].price || 0);
+          }, 0);
+  
+      // 3. The incremental cost is the difference
+      const addedCost = nextTotal - currentTotal;
+  
+      const isDiscounted = nextOffer && (nextOffer.fullPrice > nextOffer.sellingPrice);
+  
+      return (
+        <div className="text-right">
+          <p className={cn("font-bold text-lg", isDiscounted ? "text-green-600" : "text-destructive")}>
+            +{addedCost.toFixed(0)} THB
+          </p>
+          <p className="text-xs text-muted-foreground line-through">{originalPrice.toFixed(0)} THB</p>
+        </div>
+      );
+    };
   
   return (
     <div
