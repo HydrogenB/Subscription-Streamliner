@@ -16,6 +16,22 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'images.icon-icons.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cms.dmpcdn.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'yt3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.true.th',
+      },
     ],
   },
 };

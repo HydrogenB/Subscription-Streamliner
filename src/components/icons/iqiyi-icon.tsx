@@ -1,8 +1,14 @@
+import Image from 'next/image';
+
 export function IQIYIIcon(props: React.SVGProps<SVGSVGElement>) {
     return (
-      <svg {...props} viewBox="0 0 100 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100" height="40" rx="8" fill="#50C240"/>
-        <text x="50" y="25" fontFamily="Arial, sans-serif" fontSize="18" fill="white" textAnchor="middle" fontWeight="bold">iQIYI</text>
-      </svg>
+      <Image
+        src="https://yt3.googleusercontent.com/R14r3tJePVd8Wu8qeslUa0eBCGpizZBGECAqhZmwFpfwcPtdvzvIqy7tJuuCKWkyKI6Wzex3yuo=s900-c-k-c0x00ffffff-no-rj"
+        alt="iQIYI logo"
+        width={40}
+        height={40}
+        className={props.className}
+        style={{ objectFit: 'contain' }}
+      />
     );
 }

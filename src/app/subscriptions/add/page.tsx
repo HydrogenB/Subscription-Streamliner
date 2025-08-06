@@ -8,7 +8,7 @@ import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { SubscriptionService } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Globe, Tv, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Globe, Tv, AlertCircle, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GiftIcon } from '@/components/icons/gift-icon';
 import { NetflixIcon } from '@/components/icons/netflix-icon';
@@ -125,9 +125,7 @@ export default function AddBundlePage() {
     return { total: 0, savings: 0, packName: "Choose your bundle", isValidBundle: false, fullPrice: 0 };
   }, [selectedServices]);
 
-  const allServices = subscriptionServices;
-
-    const getPriceInfo = (serviceId: ServiceId): { text: string; originalPrice?: string; isIncremental: boolean } => {
+  const getPriceInfo = (serviceId: ServiceId): { text: string; originalPrice?: string; isIncremental: boolean } => {
     const service = subscriptionServices.find(s => s.id === serviceId);
     if (!service) return { text: '', isIncremental: false };
     
@@ -161,7 +159,7 @@ export default function AddBundlePage() {
     const nextOffer = findBestOffer(potentialSelection);
     
     if (nextOffer) {
-        const increment = nextOffer.sellingPrice - currentTotal;
+        const increment = nextOffer.sellingPrice - total;
         const priceInfo: { text: string; originalPrice?: string; isIncremental: boolean } = {
             text: `+${Math.max(0, increment).toFixed(0)} THB`,
             isIncremental: true,
@@ -172,9 +170,24 @@ export default function AddBundlePage() {
         }
         return priceInfo;
     } else {
-        return { text: `+${standalonePrice.toFixed(0)} THB`, isIncremental: false };
+        // If it does not form a valid bundle, show the full price
+        if (selectedServices.size > 0 && !isValidBundle) {
+             return { text: `${standalonePrice.toFixed(0)} THB`, isIncremental: false };
+        }
+        // If it's a valid bundle but this addition breaks it, show the full price.
+        const currentSelectedPrice = Array.from(selectedServices).reduce((acc, id) => acc + (subscriptionServices.find(s => s.id === id)?.plans[0].price ?? 0), 0)
+        if (isValidBundle && (currentSelectedPrice + standalonePrice) > (total + standalonePrice) ) {
+            const increment = total + standalonePrice - currentTotal;
+            if (increment > 0) {
+                return { text: `+${standalonePrice.toFixed(0)} THB`, isIncremental: false };
+            }
+        }
+
+        // Default to standalone price if no other logic fits
+        return { text: `+${standalonePrice.toFixed(0)} THB`, isIncremental: true };
     }
   };
+
 
   const isNetflixConflict = (serviceId: ServiceId): boolean => {
     if (!NETFLIX_PLANS.includes(serviceId)) {
@@ -219,70 +232,87 @@ export default function AddBundlePage() {
       </main>
 
       <footer className="fixed bottom-0 left-0 right-0 z-10 max-w-md mx-auto">
-        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out pb-safe-bottom")}>
+        <div className={cn("bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out", isSummaryOpen && "pb-safe-bottom")}>
            <div className={cn("px-4 transition-all duration-300 ease-in-out", !isSummaryOpen && 'pt-4')}>
 
             <div 
-              className="flex justify-between items-center cursor-pointer"
+              className={cn(
+                "flex justify-between items-center cursor-pointer",
+                !isSummaryOpen && "py-4 border-t"
+              )}
               onClick={() => setIsSummaryOpen(prev => !prev)}
             >
-                <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
-                    {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-gray-500" /> : <ChevronUp className="w-5 h-5 text-gray-500" />}
-                </div>
-
-                {!isSummaryOpen && (
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-red-600 font-bold text-xl">{total.toFixed(0)} บาท</span>
+              {!isSummaryOpen ? (
+                <>
+                    <div className="flex items-center gap-2">
+                         <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
+                         <ChevronUp className="w-5 h-5 text-gray-500" />
                     </div>
-                )}
+                    <div className="flex items-center gap-4">
+                        <span className="text-red-600 font-bold text-xl">{total.toFixed(0)} บาท</span>
+                        <Button 
+                            size="lg" 
+                            className="bg-red-600 hover:bg-red-700 rounded-full h-12 text-lg font-bold px-6" 
+                            disabled={!isValidBundle || selectedServices.size === 0}
+                            onClick={(e) => { e.stopPropagation(); /* Handle navigation */ }}
+                        >
+                            ถัดไป
+                            <ArrowRight className="ml-2 h-5 w-5" />
+                        </Button>
+                    </div>
+                </>
+              ) : (
+                <div className="flex justify-between items-center w-full" >
+                    <h3 className="font-bold text-lg">สรุปค่าบริการรายเดือน</h3>
+                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                </div>
+              )}
             </div>
           </div>
           
           <div className={cn("overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
-            <div className="px-4 pb-4 space-y-4">
+             <div className="px-4 pb-4 space-y-4">
                 <div className="p-3 mt-4 rounded-lg bg-gradient-to-r from-red-500 to-purple-600 text-white font-semibold text-center text-sm">
-                ส่วนลดสูงสุด {maxSavings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป
+                    ส่วนลดสูงสุด {maxSavings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป
                 </div>
 
                 {selectedServices.size > 0 ? (
-                <div className="space-y-4 pt-2">
-                    <div>
-                        <h4 className="font-bold text-gray-800 mb-2">บริการของคุณ</h4>
-                        <ul className="space-y-1.5 text-sm text-gray-600">
-                            {Array.from(selectedServices).map(id => {
-                            const service = subscriptionServices.find(s => s.id === id);
-                            if (!service) return null;
-                            const individualPrice = service.plans[0].price;
-                            return (
-                                <li key={id} className="flex justify-between items-center">
-                                <span>• {serviceDisplayConfig[id as ServiceId].title}</span>
-                                <span>{individualPrice.toFixed(0)} บาท</span>
-                                </li>
-                            );
-                            })}
-                        </ul>
-                    </div>
-
-                    {isValidBundle && savings > 0 && (
+                    <div className="space-y-4 pt-2">
                         <div>
-                            <h4 className="font-bold text-gray-800 mb-2">ส่วนลด</h4>
-                            <ul className="space-y-1.5 text-sm">
-                            <li className="flex justify-between items-center">
-                                <span>• ส่วนลดสำหรับ {selectedServices.size} บริการ</span>
-                                <span className="text-green-600 font-medium">-{savings.toFixed(0)} บาท</span>
-                            </li>
+                            <h4 className="font-bold text-gray-800 mb-2 text-base">บริการของคุณ</h4>
+                            <ul className="space-y-2 text-sm text-gray-700">
+                                {Array.from(selectedServices).map(id => {
+                                    const service = subscriptionServices.find(s => s.id === id);
+                                    if (!service) return null;
+                                    const individualPrice = service.plans[0].price;
+                                    return (
+                                        <li key={id} className="flex justify-between items-center">
+                                            <span>• {serviceDisplayConfig[id as ServiceId].title}</span>
+                                            <span>{individualPrice.toFixed(0)} บาท</span>
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         </div>
-                    )}
-                    
-                    { !isValidBundle && selectedServices.size > 0 && selectedServices.size < 4 && (
-                        <p className="text-xs text-muted-foreground italic text-center pt-2">
-                        + เพิ่มบริการเพื่อรับส่วนลด (ไม่บังคับเลือก)
-                        </p>
-                    )}
 
-                </div>
+                        {isValidBundle && savings > 0 && (
+                             <div>
+                                <h4 className="font-bold text-gray-800 mb-2 text-base">ส่วนลด</h4>
+                                <ul className="space-y-1.5 text-sm">
+                                <li className="flex justify-between items-center">
+                                    <span className="text-gray-700">• ส่วนลดสำหรับ {selectedServices.size} บริการ</span>
+                                    <span className="font-medium text-green-600">-{savings.toFixed(0)} บาท</span>
+                                </li>
+                                </ul>
+                            </div>
+                        )}
+                        
+                        {!isValidBundle && selectedServices.size > 0 && selectedServices.size < 4 && (
+                            <p className="text-xs text-muted-foreground italic text-center pt-2">
+                                + เพิ่มบริการเพื่อรับส่วนลด (ไม่บังคับเลือก)
+                            </p>
+                        )}
+                    </div>
                 ) : (
                     <p className="text-center text-muted-foreground py-4">
                         Please select at least one service.
@@ -290,33 +320,31 @@ export default function AddBundlePage() {
                 )}
 
                 <div className="flex justify-between items-end pt-4 border-t mt-2">
-                <span className="text-sm text-muted-foreground">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
-                <span className="text-red-600 font-bold text-2xl">{total.toFixed(0)} บาท</span>
+                    <span className="text-base font-medium text-gray-800">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
+                    <span className="text-red-600 font-bold text-2xl">{total.toFixed(0)} บาท</span>
                 </div>
             </div>
-          </div>
-          
-          <div className="px-4 pb-4 pt-2 bg-white">
-             {selectedServices.size > 0 && (
-              <div className="space-y-3">
-                 {!isValidBundle && (
-                  <div className="bg-red-50 border-l-4 border-red-500 text-red-800 p-3 rounded-r-lg flex items-center gap-3 text-sm">
-                    <AlertCircle className="w-5 h-5" />
-                    <span>This combination is not available as a bundle. Please adjust your selection.</span>
-                  </div>
+
+            <div className="px-4 pb-4 pt-2">
+                {selectedServices.size > 0 && (
+                    <div className="space-y-3">
+                        {!isValidBundle && (
+                            <div className="bg-red-50 border-l-4 border-red-500 text-red-800 p-3 rounded-r-lg flex items-center gap-3 text-sm">
+                                <AlertCircle className="w-5 h-5" />
+                                <span>This combination is not available as a bundle. Please adjust your selection.</span>
+                            </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                            {[1, 2, 3, 4].map(step => (
+                                <div key={step} className={cn("h-1.5 rounded-full flex-1", selectedServices.size >= step ? 'bg-red-500' : 'bg-gray-200')}></div>
+                            ))}
+                        </div>
+                        <Button size="lg" className="w-full bg-red-600 hover:bg-red-700 rounded-full h-12 text-lg font-bold" disabled={!isValidBundle || selectedServices.size === 0}>
+                            ถัดไป
+                        </Button>
+                    </div>
                 )}
-
-                <div className="flex items-center gap-2">
-                  {[1, 2, 3, 4].map(step => (
-                    <div key={step} className={cn("h-1.5 rounded-full flex-1", selectedServices.size >= step ? 'bg-red-500' : 'bg-gray-200')}></div>
-                  ))}
-                </div>
-
-                <Button size="lg" className="w-full bg-red-600 hover:bg-red-700 rounded-full h-12 text-lg font-bold" disabled={!isValidBundle || selectedServices.size === 0}>
-                  ถัดไป
-                </Button>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       </footer>
@@ -358,12 +386,15 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
                 finalIsDisabled && "data-[state=checked]:bg-gray-400 data-[state=checked]:border-gray-500"
               )} 
             />
-            <Icon className={cn("w-8 h-8", service.id.startsWith('netflix') && 'w-6 h-10', service.id === 'youtube' && 'w-10 h-8')} />
+            <Icon 
+              className={cn("w-10 h-10 object-contain", service.id.startsWith('netflix') && 'w-7 h-10')} 
+              serviceId={service.id}
+            />
             <div className="flex-grow">
               <span className={cn("font-bold", finalIsDisabled && "text-gray-500")}>{title}</span>
-              <div className="min-h-[1.25rem]">
-              {isConflicting && <p className="text-xs text-destructive mt-1">Only one Netflix plan allowed.</p>}
-              {isDisabled && !isSelected && !isConflicting && <p className="text-xs text-destructive mt-1">Maximum of {MAX_SELECTION_LIMIT} services allowed.</p>}
+              <div className="min-h-[1.25rem] mt-1">
+                {isConflicting && <p className="text-xs text-destructive">Only one Netflix plan allowed.</p>}
+                {isDisabled && !isSelected && !isConflicting && <p className="text-xs text-destructive">Maximum of {MAX_SELECTION_LIMIT} services allowed.</p>}
               </div>
             </div>
         </div>

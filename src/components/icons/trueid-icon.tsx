@@ -1,8 +1,21 @@
-export function TrueIDIcon(props: React.SVGProps<SVGSVGElement>) {
-    return (
-        <svg {...props} viewBox="0 0 100 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="100" height="40" rx="8" fill="#E3170A"/>
-            <text x="50" y="25" fontFamily="Arial, sans-serif" fontSize="18" fill="white" textAnchor="middle" fontWeight="bold">TrueID</text>
-        </svg>
-    );
+import Image from 'next/image';
+
+export function TrueIDIcon(props: React.SVGProps<SVGSVGElement> & { serviceId?: string }) {
+  const logos = {
+    trueplus: "https://cms.dmpcdn.com/helpcenter/2022/04/04/3f6f68a0-b3d3-11ec-a6ff-d1a30b937bc5_webp_original.png",
+    trueidshort: "https://cms.dmpcdn.com/trueyoumerchant/2025/05/16/a12119a0-3232-11f0-aef9-77bd2df9da99_webp_original.webp",
+  };
+  
+  const src = props.serviceId === 'trueplus' ? logos.trueplus : logos.trueidshort;
+
+  return (
+     <Image
+      src={src}
+      alt="TrueID logo"
+      width={64}
+      height={40}
+      className={props.className}
+      style={{ objectFit: 'contain' }}
+    />
+  );
 }
