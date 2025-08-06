@@ -84,6 +84,7 @@ export default function AddBundlePage() {
         newSelection.delete(serviceId);
       } else {
         if (newSelection.size >= MAX_SELECTION_LIMIT) {
+          alert(`You can select a maximum of ${MAX_SELECTION_LIMIT} services.`);
           return prev;
         }
 
@@ -186,9 +187,40 @@ export default function AddBundlePage() {
       }
       
       return priceInfo;
+    } else {
+      let currentTotal = 0;
+      if (selectedServices.size > 0) {
+          const currentOffer = findBestOffer(selectedServices);
+          if (currentOffer) {
+              currentTotal = currentOffer.sellingPrice;
+          } else {
+              currentTotal = Array.from(selectedServices).reduce((acc, id) => {
+                  const s = subscriptionServices.find(s => s.id === id);
+                  return acc + (s?.plans[0].price || 0);
+              }, 0);
+          }
+      }
+
+      const servicePrice = service.plans[0].price;
+      const increment = servicePrice;
+      
+       const potentialSelectionWithService = new Set(selectedServices);
+       potentialSelectionWithService.add(serviceId);
+       const nextOfferWithService = findBestOffer(potentialSelectionWithService);
+       
+       if(!nextOfferWithService) {
+         const newTotal = Array.from(potentialSelectionWithService).reduce((acc, id) => {
+            const s = subscriptionServices.find(s => s.id === id);
+            return acc + (s?.plans[0].price || 0);
+         }, 0);
+         const newIncrement = newTotal - currentTotal;
+
+         return { text: `+${newIncrement.toFixed(0)} THB`, isIncremental: true, originalPrice: `${service.plans[0].price.toFixed(0)} THB` };
+       }
+
     }
   
-    return { text: '', isIncremental: false };
+    return { text: `${service.plans[0].price} THB`, isIncremental: false };
   };
 
   const isNetflixConflict = (serviceId: ServiceId): boolean => {
@@ -237,7 +269,7 @@ export default function AddBundlePage() {
         <div className="relative">
           <button 
             onClick={() => setIsSummaryOpen(prev => !prev)}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center border transition-transform hover:scale-110"
+            className="absolute -top-3 left-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center border"
           >
             {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-red-500" /> : <ChevronUp className="w-5 h-5 text-red-500" />}
           </button>
@@ -301,7 +333,7 @@ export default function AddBundlePage() {
           
           <div className="px-4 pb-4 pt-4 space-y-3 bg-white">
               { !isValidBundle && selectedServices.size > 0 && (
-                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded-lg flex items-center gap-3 text-sm">
+                <div className="bg-red-50 border-l-4 border-red-500 text-red-800 p-3 rounded-lg flex items-center gap-3 text-sm">
                   <AlertCircle className="w-5 h-5" />
                   <span>This combination is not available as a bundle. Please adjust your selection.</span>
                 </div>
@@ -365,7 +397,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, is
         <div className="flex-grow">
           <span className={cn("font-bold", finalIsDisabled && "text-gray-500")}>{title}</span>
            {isConflicting && <p className="text-xs text-destructive mt-1">Only one Netflix plan allowed.</p>}
-           {isDisabled && !isSelected && <p className="text-xs text-destructive mt-1">Maximum of {MAX_SELECTION_LIMIT} services allowed.</p>}
+           {isDisabled && !isSelected && !isConflicting && <p className="text-xs text-destructive mt-1">Maximum of {MAX_SELECTION_LIMIT} services allowed.</p>}
           {isSelected && service.plans[0].features.length > 0 && (
             <div className="mt-3 space-y-1 text-gray-600 text-sm">
                 {service.plans[0].features.map((feature, index) => (
