@@ -69,4 +69,7 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+  .pb-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 1rem);
+  }
 }

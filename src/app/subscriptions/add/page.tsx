@@ -160,14 +160,16 @@ export default function AddBundlePage() {
     if (nextOffer) {
       let currentTotal;
 
-      const currentOffer = findBestOffer(selectedServices); // Use original `selectedServices`
+      const currentOffer = findBestOffer(selectedServices);
       if (currentOffer) {
         currentTotal = currentOffer.sellingPrice;
-      } else {
+      } else if (selectedServices.size > 0) {
         currentTotal = Array.from(selectedServices).reduce((acc, id) => {
             const service = subscriptionServices.find(s => s.id === id);
             return acc + (service?.plans[0].price || 0);
         }, 0);
+      } else {
+         currentTotal = 0;
       }
       
       const increment = nextOffer.sellingPrice - currentTotal;
@@ -200,7 +202,7 @@ export default function AddBundlePage() {
   const maxSavings = Math.max(...offerGroups.filter(o => o.services.length === 4).map(o => o.fullPrice - o.sellingPrice));
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-gray-50 pb-safe-bottom">
       <Header showBackButton title="Add bundle" />
       <main className="flex-grow overflow-y-auto pb-48">
         <div className="p-4 space-y-4">
@@ -231,11 +233,11 @@ export default function AddBundlePage() {
         </div>
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-10">
+      <footer className="fixed bottom-0 left-0 right-0 max-w-md mx-auto z-10 pb-safe-bottom">
         <div className="relative">
           <button 
             onClick={() => setIsSummaryOpen(prev => !prev)}
-            className="absolute -top-3 left-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center border"
+            className="absolute -top-3 left-1/2 -translate-x-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center border transition-transform hover:scale-110"
           >
             {isSummaryOpen ? <ChevronDown className="w-5 h-5 text-red-500" /> : <ChevronUp className="w-5 h-5 text-red-500" />}
           </button>
@@ -294,14 +296,14 @@ export default function AddBundlePage() {
                 )}
               </div>
             )}
-             { !isValidBundle && selectedServices.size > 0 && (
-              <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 rounded-lg flex items-center gap-3 text-sm mt-4">
-                <AlertCircle className="w-5 h-5" />
-                <span>This combination is not available as a bundle. Please adjust your selection.</span>
-              </div>
-            )}
           </div>
           <div className="px-4 pb-4 border-t pt-4 space-y-3">
+              { !isValidBundle && selectedServices.size > 0 && (
+                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded-lg flex items-center gap-3 text-sm">
+                  <AlertCircle className="w-5 h-5" />
+                  <span>This combination is not available as a bundle. Please adjust your selection.</span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
                   <span className="text-red-600 font-bold text-xl">{total.toFixed(0)} บาท</span>
