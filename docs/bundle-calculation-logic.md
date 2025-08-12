@@ -36,15 +36,29 @@ Each card in the "build your own bundle" list displays a dynamic price based on 
 - The card displays the **incremental cost** to add that service to the current selection.
 - This is the most complex calculation. It is determined by the `getPriceInfo` function in `add/page.tsx`.
 
-#### Incremental Cost Algorithm:
-1.  **Calculate Current Total:** The system first finds the best possible price for the set of services *already selected* by the user. It does this by searching `offerGroups` for a matching bundle. If no bundle is found, it sums the promotional standalone prices.
-2.  **Calculate Potential New Total:** The system then calculates a *hypothetical* new total if the service being hovered over were added to the selection. It finds the best bundle price for this new, larger set of services.
-3.  **Determine Incremental Cost:** The incremental cost is the difference between the potential new total and the current total.
-    - `Incremental Cost = (Potential New Total) - (Current Total)`
-4.  **Display:** This value is displayed with a `+` prefix (e.g., `+60 THB`). The service's full standalone price remains visible (e.g., `149 THB`) with a strikethrough to provide context.
+#### Incremental Cost Algorithm (`getPriceInfo`):
+The function calculates the cost difference between the user's current selection and what the selection *would be* if they added the service they are hovering over.
+
+1.  **Calculate Current Total Price:**
+    - The system takes the set of services the user has *already selected*.
+    - It calls the `findBestOffer` utility to find the best possible bundle deal for this current set.
+    - If a matching bundle is found, its `sellingPrice` is used as the `currentTotal`.
+    - If no bundle is found, the `currentTotal` is the sum of the individual promotional prices of the selected services.
+
+2.  **Calculate Potential New Total Price:**
+    - The system creates a *hypothetical* new set of services, which includes all currently selected services *plus* the service being hovered over.
+    - It calls `findBestOffer` again on this new, hypothetical set to find the best bundle deal.
+    - The resulting price is the `potentialNewTotal`.
+
+3.  **Determine and Display Incremental Cost:**
+    - The incremental cost is the difference between the two calculated totals:
+    - `Incremental Cost = potentialNewTotal - currentTotal`
+    - This value is displayed on the card with a `+` prefix (e.g., `+60 THB`).
+    - The service's full standalone price remains visible (e.g., `149 THB`) with a strikethrough to provide context and show the value of bundling.
 
 #### Special Case: Plan Swapping (e.g., Netflix Tiers)
-- If the user has a service selected (e.g., Netflix Standard) and hovers over another variant of the same service (e.g., Netflix Mobile), the logic calculates the cost difference for a *swap* rather than an addition.
+- If the user has a service selected (e.g., Netflix Standard) and hovers over another variant of the same service (e.g., Netflix Mobile), the logic calculates the cost for a *swap* rather than an addition.
+- In this scenario, the `currentTotal` is calculated *without* any Netflix plan, and the `potentialNewTotal` is calculated with only the *new* Netflix plan added.
 - If the new plan is cheaper, the incremental cost is displayed as a **negative value** inside parentheses, representing a savings.
 - **Example:** User has Netflix Standard (349 THB) selected. Hovering over Netflix Mobile (99 THB).
     - `Incremental Cost = 99 - 349 = -250`
@@ -54,26 +68,37 @@ Each card in the "build your own bundle" list displays a dynamic price based on 
 
 The sticky footer at the bottom of the page provides a real-time summary of the user's monthly bill.
 
-1.  **Find the Best Offer:** The `findBestOffer` utility function is the heart of this logic. It takes the set of currently selected service IDs and searches through all `offerGroups`.
-    - It prioritizes an **exact match** (a bundle containing exactly the selected services).
-    - If no exact match is found, it looks for a **superset match** (a bundle that includes all selected services plus others, if it's cheaper).
-    - If still no match, it checks for **subset matches** to find the best possible deal among the selected items.
+1.  **Find the Best Offer:** The `findBestOffer` utility function is the heart of this logic. It takes the set of currently selected service IDs and searches through all `offerGroups` to find the most cost-effective deal.
 2.  **Calculate Total & Savings:**
-    - If a `bestOffer` is found and it's an exact match, the `total` is the bundle's `sellingPrice`. The `savings` are `fullPrice - sellingPrice`.
-    - If no exact bundle match is found, the `total` is the sum of the individual promotional prices of the selected services, and `savings` are zero. The UI displays an alert that "No bundle available for this combination."
+    - If a `bestOffer` is found and it's an **exact match** for the user's selection, the `total` is the bundle's `sellingPrice`. The `savings` are calculated as `fullPrice - sellingPrice`.
+    - If no exact bundle match is found, the `total` is the sum of the individual promotional prices of the selected services. In this case, `savings` are zero, and the UI displays an alert that "No bundle available for this combination."
 3.  **Display:** The footer displays the `packName` (e.g., "Custom Bundle" or the matched offer's ID), the total savings, and the final monthly price.
 
 ## 4. Final Bundle Selection (`findBestOffer`)
 
-The `findBestOffer` function is the critical piece of logic that determines the final `OfferGroup` to which the user will be subscribed. Its goal is to always find the most cost-effective bundle for the user's chosen services.
+The `findBestOffer` function is the critical piece of logic that determines the final `OfferGroup` to which the user will be subscribed. Its goal is to always find the most cost-effective bundle for the user's chosen services. It operates with a clear priority system to resolve ambiguity.
 
 **Algorithm:**
 1.  **Input:** A `Set<ServiceId>` of the user's selected services.
-2.  **Priority 1: Exact Match:** Iterate through `offerGroups` to find a bundle where the services match the user's selection exactly. If multiple exact matches exist (e.g., different promotions for the same set of services), it chooses the one with the lowest `sellingPrice`.
-3.  **Priority 2: Superset Match:** If no exact match is found, it checks if any bundle contains *all* of the user's selected services, plus potentially others. This can sometimes be cheaper. It selects the cheapest valid superset offer.
-4.  **Priority 3: Subset Match (Best Effort):** If neither of the above finds a deal, it looks for the best available bundle among any subset of the user's selections. This is a fallback to ensure some discount is applied if possible.
-5.  **Fallback: No Bundle:** If no offer logic applies, the function returns `null`, and the price is calculated by summing the individual standalone promotional prices.
-6.  **Output:** The function returns the optimal `OfferGroup` object or `null`. This object is then used to populate the confirmation and receipt pages.
+2.  **Priority 1: Find Exact Match:**
+    - The function first iterates through all `offerGroups` to find a bundle where the services match the user's selection *exactly* (same services and same number of services).
+    - If multiple exact matches exist (e.g., different promotions for the same set of services), it will choose the one with the lowest `sellingPrice`. This is considered the optimal outcome.
+
+3.  **Priority 2: Find Superset Match:**
+    - If no exact match is found, the function checks if any available bundle contains *all* of the user's selected services, plus potentially others (a "superset").
+    - This is considered because a larger bundle might paradoxically be cheaper due to a special promotion.
+    - If multiple superset bundles are found, the one with the lowest `sellingPrice` is chosen as the `bestOffer`.
+
+4.  **Priority 3: Find Best-Effort Subset Match:**
+    - If neither an exact nor a superset match is found, the function makes a best-effort attempt to find a bundle that is a *subset* of the user's selection.
+    - For example, if the user selects A, B, and C, but the best deal is a bundle for A and B, this logic will identify it.
+    - It selects the subset bundle that offers the best value (`sellingPrice`) or contains the most items from the user's selection. This is a fallback to ensure some discount is applied if at all possible.
+
+5.  **Fallback: No Bundle Found:**
+    - If no offer logic from the above priorities applies, the function returns `null`.
+    - When this happens, the UI calculates the total price by summing the individual standalone promotional prices of each selected service.
+
+6.  **Output:** The function returns the single, optimal `OfferGroup` object based on the priority system, or `null` if no suitable bundle is found. This object is then used to populate the confirmation and receipt pages.
 
 ## 5. Localization
 
