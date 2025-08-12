@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import { useState, useMemo, useRef } from 'react';
@@ -35,6 +34,23 @@ const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: 
   'netflix-standard': { Icon: NetflixIcon, title: 'Netflix Standard' },
   'netflix-premium': { Icon: NetflixIcon, title: 'Netflix Premium' },
 };
+
+function getParentServiceName(serviceId: ServiceId): string {
+    const service = subscriptionServices.find(s => s.id === serviceId);
+    if (!service) return serviceId;
+    // Extracts the base name, e.g., "Netflix" from "Netflix Mobile"
+    return service.name.split(' ')[0];
+}
+
+const serviceGroups: Record<string, ServiceId[]> = subscriptionServices.reduce((acc, service) => {
+    const parentName = getParentServiceName(service.id);
+    if (!acc[parentName]) {
+        acc[parentName] = [];
+    }
+    acc[parentName].push(service.id);
+    return acc;
+}, {} as Record<string, ServiceId[]>);
+
 
 function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
     if (selectedIds.size === 0) {
@@ -81,7 +97,6 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
     return bestOffer;
 }
 
-const NETFLIX_PLANS: ServiceId[] = ['netflix-mobile', 'netflix-basic', 'netflix-standard', 'netflix-premium'];
 const MAX_SELECTION_LIMIT = 4;
 
 const allServices = subscriptionServices;
@@ -99,26 +114,36 @@ export default function AddBundlePage() {
 
   const handleServiceToggle = (serviceId: ServiceId) => {
     setSelectedServices(prev => {
-      const newSelection = new Set(prev);
-      
-      if (newSelection.has(serviceId)) {
-        newSelection.delete(serviceId);
-      } else {
-        if (newSelection.size >= MAX_SELECTION_LIMIT && !NETFLIX_PLANS.some(p => newSelection.has(p) && NETFLIX_PLANS.includes(serviceId))) {
-          alert(`You can select a maximum of ${MAX_SELECTION_LIMIT} services.`);
-          return prev;
-        }
+        const newSelection = new Set(prev);
+        const parentName = getParentServiceName(serviceId);
+        const serviceGroup = serviceGroups[parentName];
+        const isSelected = newSelection.has(serviceId);
+        const isGroupMemberSelected = serviceGroup.some(id => newSelection.has(id));
 
-        if (NETFLIX_PLANS.includes(serviceId)) {
-          for (const plan of NETFLIX_PLANS) {
-            newSelection.delete(plan);
-          }
+        if (isSelected) {
+            newSelection.delete(serviceId);
+        } else {
+            // Count selected parent services
+            const selectedParentServices = new Set(
+                Array.from(newSelection).map(id => getParentServiceName(id))
+            );
+
+            if (!isGroupMemberSelected && selectedParentServices.size >= MAX_SELECTION_LIMIT) {
+                alert(`You can select a maximum of ${MAX_SELECTION_LIMIT} services.`);
+                return prev;
+            }
+            
+            // If another plan from the same service is selected, swap it
+            if (serviceGroup) {
+                for (const plan of serviceGroup) {
+                    newSelection.delete(plan);
+                }
+            }
+            newSelection.add(serviceId);
         }
-        newSelection.add(serviceId);
-      }
-      return newSelection;
+        return newSelection;
     });
-  };
+};
 
   const { total, savings, packName, isValidBundle, fullPrice } = useMemo(() => {
     const matchedOffer = findBestOffer(selectedServices);
@@ -329,13 +354,13 @@ interface ServiceCardProps {
 }
 
 function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServices }: ServiceCardProps) {
-    const isNetflixService = NETFLIX_PLANS.includes(service.id as ServiceId);
-    const selectedNetflixPlan = NETFLIX_PLANS.find(plan => selectedServices.has(plan));
-    const isNetflixConflict = isNetflixService && selectedNetflixPlan && selectedNetflixPlan !== service.id;
+    const parentName = getParentServiceName(service.id);
+    const serviceGroup = serviceGroups[parentName];
+    const selectedPlanInGroup = serviceGroup.find(plan => selectedServices.has(plan));
+    const isPlanSwitch = selectedPlanInGroup && selectedPlanInGrup !== service.id;
 
-    const isDisabled = (!isSelected && selectedServices.size >= MAX_SELECTION_LIMIT && !isNetflixConflict) ||
-                         (!isSelected && selectedServices.size >= MAX_SELECTION_LIMIT && isNetflixService && !selectedNetflixPlan);
-
+    const selectedParentServicesCount = new Set(Array.from(selectedServices).map(id => getParentServiceName(id))).size;
+    const isDisabled = !isSelected && !selectedPlanInGroup && selectedParentServicesCount >= MAX_SELECTION_LIMIT;
 
     const getPriceInfo = useMemo(() => {
         const calculateTotalPrice = (services: Set<ServiceId>): number => {
@@ -345,7 +370,8 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
             }
             return Array.from(services).reduce((acc, id) => {
                 const s = subscriptionServices.find(s => s.id === id);
-                return acc + (s?.plans[0].price || 0);
+                const promotionalOffer = offerGroups.find(o => o.packName === 'Pack0' && o.services[0] === id);
+                return acc + (promotionalOffer?.sellingPrice || s?.plans[0].price || 0);
             }, 0);
         };
 
@@ -360,17 +386,17 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
         let incrementalCost: number;
         const currentTotal = calculateTotalPrice(selectedServices);
 
-        if (isNetflixService && selectedNetflixPlan) {
-            // This is a Netflix plan replacement scenario
-            const tempSelectionWithoutOldNetflix = new Set(selectedServices);
-            tempSelectionWithoutOldNetflix.delete(selectedNetflixPlan);
-            const totalWithoutOldNetflix = calculateTotalPrice(tempSelectionWithoutOldNetflix);
+        if (selectedPlanInGroup) {
+            // This is a plan replacement scenario
+            const tempSelectionWithoutOldPlan = new Set(selectedServices);
+            tempSelectionWithoutOldPlan.delete(selectedPlanInGroup);
+            const totalWithoutOldPlan = calculateTotalPrice(tempSelectionWithoutOldPlan);
 
-            const tempSelectionWithNewNetflix = new Set(tempSelectionWithoutOldNetflix);
-            tempSelectionWithNewNetflix.add(service.id as ServiceId);
-            const newTotal = calculateTotalPrice(tempSelectionWithNewNetflix);
+            const tempSelectionWithNewPlan = new Set(tempSelectionWithoutOldPlan);
+            tempSelectionWithNewPlan.add(service.id as ServiceId);
+            const newTotal = calculateTotalPrice(tempSelectionWithNewPlan);
 
-            incrementalCost = newTotal - totalWithoutOldNetflix;
+            incrementalCost = newTotal - totalWithoutOldPlan;
         } else {
             // Standard addition scenario
             const potentialSelection = new Set(selectedServices);
@@ -394,13 +420,13 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
         
         return (
             <div className="text-right">
-                <p className={cn("font-bold text-lg", incrementalCost >= 0 ? "text-primary" : "text-green-600")}>
+                <p className={cn("font-bold text-lg", incrementalCost > 0 ? "text-primary" : "text-gray-500")}>
                   +{displayCost.toFixed(0)} THB
                 </p>
                 <p className="text-xs text-muted-foreground line-through">{service.plans[0].price.toFixed(0)} THB</p>
             </div>
         );
-    }, [service.id, service.plans, selectedServices, isSelected, selectedNetflixPlan, isNetflixService]);
+    }, [service.id, service.plans, selectedServices, isSelected, selectedPlanInGroup]);
   
   return (
     <div
@@ -426,7 +452,9 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
         <div className="ml-auto text-right">
             {getPriceInfo}
         </div>
-        {isNetflixConflict && <p className="text-xs text-destructive font-semibold absolute bottom-1 right-3">Only one Netflix plan allowed.</p>}
+        {isPlanSwitch && <p className="text-xs text-destructive font-semibold absolute bottom-1 right-3">Only one {parentName} plan allowed.</p>}
     </div>
   )
 }
+
+    
