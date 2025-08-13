@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +23,7 @@ function buildTrueAppLink(path: string, params: Record<string, string>) {
   return `trueapp://app.true.th${path}${search ? `?${search}` : ''}`;
 }
 
-export default function SubhubIndexPage() {
+function SubhubIndexContent() {
   const searchParams = useSearchParams();
   const initialBundle = useMemo(() => parseBundleParam(searchParams.get('bundle')), [searchParams]);
   const [bundleInput, setBundleInput] = useState(initialBundle.join(','));
@@ -97,6 +97,14 @@ export default function SubhubIndexPage() {
         </Card>
       </main>
     </div>
+  );
+}
+
+export default function SubhubIndexPage() {
+  return (
+    <Suspense fallback={null}>
+      <SubhubIndexContent />
+    </Suspense>
   );
 }
 
