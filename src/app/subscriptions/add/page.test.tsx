@@ -18,18 +18,18 @@ jest.mock('next/navigation', () => ({
 describe('AddBundlePage', () => {
   it('renders the header title', () => {
     render(<AddBundlePage />);
-    expect(screen.getByText('Add bundle')).toBeInTheDocument();
+    expect(screen.getByText('Create your bundle')).toBeInTheDocument();
   });
 
   it('renders the initial informational banner', () => {
     render(<AddBundlePage />);
-    expect(screen.getByText('Select your favorite services to see bundle deals!')).toBeInTheDocument();
+    expect(screen.getByText('Pick your services to unlock bundle savings.')).toBeInTheDocument();
   });
 
   it('renders the footer with initial state', () => {
     render(<AddBundlePage />);
-    expect(screen.getByText('Your Monthly Bill')).toBeInTheDocument();
-    expect(screen.getByText('Choose your bundle')).toBeInTheDocument();
+    expect(screen.getByText('Your monthly total')).toBeInTheDocument();
+    expect(screen.getByText('Start building')).toBeInTheDocument();
   });
 
   it('renders at least one service card', () => {

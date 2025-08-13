@@ -199,13 +199,145 @@ export default function AddBundlePage() {
     const needCount = best.addCount;
 
     const message = delta > 0
-      ? `Add ${needCount} more service(s) for just ${delta.toFixed(0)} THB to get a discount!`
-      : `Add ${needCount} more service(s) to pay only ${best.offer.sellingPrice.toFixed(0)} THB total (save ${(currentTotal - best.offer.sellingPrice).toFixed(0)} THB)`;
+      ? `Add ${needCount} more service(s) for just ${delta.toFixed(0)} THB more to unlock savings.`
+      : `Complete your bundle for only ${best.offer.sellingPrice.toFixed(0)} THB/month — save ${(currentTotal - best.offer.sellingPrice).toFixed(0)} THB.`;
 
     const missing = best.offer.services.filter(id => !currentSelection.includes(id as ServiceId)) as ServiceId[];
 
     return { offer: best.offer, needCount, delta, message, missing } as const;
   }, [selectedServices]);
+
+  // CMO-driven suggestion: also suggest removing or swapping plans to unlock a bundle
+  const cmoSuggestion = useMemo(() => {
+    if (selectedServices.size === 0) return null;
+
+    // Helper: calculate current full total with standard prices (no bundle applied)
+    const currentFullPrice = Array.from(selectedServices).reduce((acc, id) => {
+      const svc = subscriptionServices.find(s => s.id === id);
+      return acc + (svc?.plans[0].price || 0);
+    }, 0);
+
+    type Suggestion = {
+      kind: 'add' | 'remove' | 'swap' | 'replace';
+      message: string;
+      cta: string;
+      suggestedSelection: Set<ServiceId>;
+      icons?: ServiceId[];
+      newTotal: number;
+      savings: number;
+    };
+
+    const suggestions: Suggestion[] = [];
+
+    // 1) Swap within same parent service to unlock an exact bundle
+    const currentArray = Array.from(selectedServices) as ServiceId[];
+    const parentToSelected: Record<string, ServiceId> = {};
+    currentArray.forEach(id => {
+      parentToSelected[getParentServiceName(id)] = id;
+    });
+
+    Object.entries(parentToSelected).forEach(([parent, selectedId]) => {
+      const group = serviceGroups[parent] || [];
+      group.forEach(candidateId => {
+        if (candidateId === selectedId) return;
+        const swapped = new Set(currentArray);
+        swapped.delete(selectedId);
+        swapped.add(candidateId);
+        const offer = findBestOffer(swapped as Set<ServiceId>);
+        if (offer && offer.services.length === swapped.size) {
+          const newTotal = offer.sellingPrice;
+          const savings = currentFullPrice - newTotal;
+          const fromTitle = serviceDisplayConfig[selectedId].title;
+          const toTitle = serviceDisplayConfig[candidateId as ServiceId].title;
+          const deltaUp = newTotal - currentFullPrice;
+          const message = savings > 0
+            ? `Switch ${parent} plan: ${fromTitle.split(' ').slice(1).join(' ')} → ${toTitle.split(' ').slice(1).join(' ')} to pay only ${newTotal.toFixed(0)} THB/month — save ${savings.toFixed(0)} THB.`
+            : `Upgrade ${parent} plan: ${fromTitle.split(' ').slice(1).join(' ')} → ${toTitle.split(' ').slice(1).join(' ')} to unlock a bundle for ${newTotal.toFixed(0)} THB/month (+${deltaUp.toFixed(0)} THB).`;
+          suggestions.push({
+            kind: 'swap',
+            message,
+            cta: `Switch plan`,
+            suggestedSelection: swapped as Set<ServiceId>,
+            icons: Array.from(swapped) as ServiceId[],
+            newTotal,
+            savings,
+          });
+        }
+      });
+    });
+
+    // 2) Replace exactly one service to match a same-size bundle
+    const sameSizeOffers = offerGroups.filter(o => o.services.length === currentArray.length);
+    sameSizeOffers.forEach(o => {
+      const overlap = (o.services as string[]).filter(id => currentArray.includes(id as ServiceId)).length;
+      if (overlap === currentArray.length - 1) {
+        const addId = (o.services as ServiceId[]).find(id => !currentArray.includes(id));
+        const removeId = currentArray.find(id => !(o.services as string[]).includes(id));
+        if (!addId || !removeId) return;
+        const suggestedSelection = new Set(o.services as ServiceId[]);
+        const newTotal = o.sellingPrice;
+        const savings = currentFullPrice - newTotal;
+        const removeTitle = serviceDisplayConfig[removeId].title;
+        const addTitle = serviceDisplayConfig[addId].title;
+        suggestions.push({
+          kind: 'replace',
+          message: `Replace ${removeTitle} with ${addTitle} to pay only ${newTotal.toFixed(0)} THB/month — save ${Math.max(0, savings).toFixed(0)} THB.`,
+          cta: 'Replace service',
+          suggestedSelection,
+          icons: Array.from(suggestedSelection),
+          newTotal,
+          savings,
+        });
+      }
+    });
+
+    // 3) Remove services to match the best subset bundle
+    const subsetCandidates = offerGroups
+      .filter(o => (o.services as string[]).every(id => currentArray.includes(id as ServiceId)) && o.services.length < currentArray.length);
+    subsetCandidates.forEach(o => {
+      const newTotal = o.sellingPrice;
+      const savings = currentFullPrice - newTotal;
+      if (savings > 0) {
+        const keep = new Set(o.services as ServiceId[]);
+        const extras = currentArray.filter(id => !keep.has(id));
+        suggestions.push({
+          kind: 'remove',
+          message: `Remove ${extras.length} item(s) to pay only ${newTotal.toFixed(0)} THB/month — save ${savings.toFixed(0)} THB.`,
+          cta: `Apply best price`,
+          suggestedSelection: keep,
+          icons: Array.from(keep),
+          newTotal,
+          savings,
+        });
+      }
+    });
+
+    // 4) Prefer upsell via add (if available and within limit) – reuse promotionSuggestion
+    if (promotionSuggestion) {
+      const newTotal = promotionSuggestion.offer.sellingPrice;
+      const savings = currentFullPrice - newTotal;
+      suggestions.push({
+        kind: 'add',
+        message: promotionSuggestion.message,
+        cta: 'Complete bundle',
+        suggestedSelection: new Set(promotionSuggestion.offer.services as ServiceId[]),
+        icons: promotionSuggestion.offer.services as ServiceId[],
+        newTotal,
+        savings,
+      });
+    }
+
+    if (suggestions.length === 0) return null;
+
+    // Prioritize: swap (lowest friction), then replace (same count), then add (upsell), then remove (downsell).
+    const priority: Record<Suggestion['kind'], number> = { swap: 4, replace: 3, add: 2, remove: 1 } as const;
+    suggestions.sort((a, b) => {
+      if (priority[b.kind] !== priority[a.kind]) return priority[b.kind] - priority[a.kind];
+      return b.savings - a.savings;
+    });
+
+    return suggestions[0];
+  }, [selectedServices, promotionSuggestion]);
   
   const handleNext = () => {
     if (selectedServices.size === 0) return;
@@ -219,14 +351,14 @@ export default function AddBundlePage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Header showBackButton title="Add bundle" />
+      <Header showBackButton title="Create your bundle" />
       <main className="flex-grow overflow-y-auto pb-48">
         <div className="p-4 space-y-6">
           
           {heroBundles.length > 0 && (
             <div>
-              <h2 className="text-xl font-bold text-center">Hero Bundles</h2>
-              <p className="text-muted-foreground text-center mb-4">Our most popular bundles with great savings.</p>
+              <h2 className="text-xl font-bold text-center">Top picks</h2>
+              <p className="text-muted-foreground text-center mb-4">Our most popular bundles—curated for the best value.</p>
               <Carousel
                 plugins={[plugin.current]}
                 opts={{
@@ -258,35 +390,21 @@ export default function AddBundlePage() {
           )}
           
           <div>
-            <h2 className="text-xl font-bold text-center mb-4 mt-8">Or build your own bundle</h2>
-            {!isValidBundle && promotionSuggestion && (
+            <h2 className="text-xl font-bold text-center mb-4 mt-8">Or create your own</h2>
+            {selectedServices.size === 0 && (
               <div className="mb-4">
-                <Card className="border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+                <Card className="border-gray-200 bg-white dark:bg-gray-800">
                   <div className="p-3 md:p-4 flex items-start gap-3">
-                    <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
+                    <div className="shrink-0 w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600" />
                     <div className="flex-1">
-                      <p className="font-semibold text-amber-800 dark:text-amber-200">Special Offer!</p>
-                      <p className="text-sm text-amber-900 dark:text-amber-100">{promotionSuggestion.message}</p>
-                      {promotionSuggestion.missing.length > 0 && (
-                        <div className="flex items-center gap-2 mt-2">
-                          {promotionSuggestion.missing.map(id => {
-                            const Icon = serviceDisplayConfig[id].Icon;
-                            return <Icon key={id} serviceid={id} className="w-5 h-5" />
-                          })}
-                        </div>
-                      )}
+                      <p className="font-semibold text-gray-900 dark:text-gray-100">Pick your services to unlock bundle savings.</p>
+                      <p className="text-sm text-muted-foreground">Choose up to 4 different services. We’ll automatically apply the best deal.</p>
                     </div>
-                    <Button
-                      size="sm"
-                      className="rounded-full"
-                      onClick={() => setSelectedServices(new Set(promotionSuggestion.offer.services as ServiceId[]))}
-                    >
-                      Complete bundle
-                    </Button>
                   </div>
                 </Card>
               </div>
             )}
+            {/* Special Offer moved to bottom sheet */}
             <div className="space-y-3">
               {allServices.map(service => (
                 <ServiceCard 
@@ -311,15 +429,15 @@ export default function AddBundlePage() {
         >
           <div className="px-4 py-3 flex justify-between items-center w-full">
               <div className="flex items-center gap-2">
-                   <h3 className="font-semibold text-base text-gray-800 dark:text-gray-200">
-                    Your Monthly Bill
-                   </h3>
+                    <h3 className="font-semibold text-base text-gray-800 dark:text-gray-200">
+                     Your monthly total
+                    </h3>
                    <ChevronUp className={cn("w-5 h-5 text-gray-500 transition-transform", !isSummaryOpen && "rotate-180")} />
               </div>
               <div className="flex items-center gap-3">
-                  {savings > 0 && (
-                     <span className="text-sm font-semibold text-green-600">Save {savings.toFixed(0)} THB</span>
-                  )}
+                   {savings > 0 && (
+                      <span className="text-sm font-semibold text-green-600">You save {savings.toFixed(0)} THB</span>
+                   )}
                   <span className="font-bold text-lg text-primary">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : `0 THB`}</span>
               </div>
           </div>
@@ -327,10 +445,10 @@ export default function AddBundlePage() {
           <div className={cn("overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
              <div className="px-4 pb-4 space-y-4">
                 
-                {selectedServices.size > 0 ? (
+                 {selectedServices.size > 0 ? (
                   <div className="space-y-4 pt-2">
                     <div>
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">Your Services</h4>
+                       <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">Your selection</h4>
                       <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                         {Array.from(selectedServices).map(id => {
                           const service = subscriptionServices.find(s => s.id === id);
@@ -351,12 +469,12 @@ export default function AddBundlePage() {
                 
                     {savings > 0 && (
                        <div>
-                        <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">Discount</h4>
+                         <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">Bundle discount</h4>
                         <ul className="space-y-1.5 text-sm">
                           <li className="flex justify-between items-center">
                             <div className="flex items-center gap-2">
                               <div className="w-5 flex justify-center"></div>
-                              <span className="text-gray-700 dark:text-gray-300">Bundle Discount</span>
+                             <span className="text-gray-700 dark:text-gray-300">Auto-applied savings</span>
                             </div>
                             <span className="font-medium text-green-600">-{savings.toFixed(0)} THB</span>
                           </li>
@@ -366,22 +484,76 @@ export default function AddBundlePage() {
                   </div>
                 ) : (
                   <div className="text-center py-4 text-muted-foreground">
-                    Please select at least one service.
+                    Select at least one service to get started.
                   </div>
                 )}
                 
-                {!isValidBundle && selectedServices.size > 0 && !promotionSuggestion && (
+                {!isValidBundle && selectedServices.size > 0 && !promotionSuggestion && !cmoSuggestion && (
                   <Card className="mt-4 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800">
                     <div className="p-3 flex items-center gap-3">
                       <AlertCircle className="w-5 h-5 text-destructive" />
-                      <p className="text-sm text-destructive">No bundle available for this combination.</p>
+                      <p className="text-sm text-destructive">No bundle found for this mix. Try a different combination to save more.</p>
+                    </div>
+                  </Card>
+                )}
+
+                {!isValidBundle && promotionSuggestion && (
+                  <Card className="mt-4 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+                    <div className="p-3 md:p-4 flex items-start gap-3">
+                      <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-amber-800 dark:text-amber-200">Limited-time offer</p>
+                        <p className="text-sm text-amber-900 dark:text-amber-100">{promotionSuggestion.message}</p>
+                        {promotionSuggestion.missing.length > 0 && (
+                          <div className="flex items-center gap-2 mt-2">
+                            {promotionSuggestion.missing.map(id => {
+                              const Icon = serviceDisplayConfig[id].Icon;
+                              return <Icon key={id} serviceid={id} className="w-5 h-5" />
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        className="rounded-full"
+                        onClick={() => setSelectedServices(new Set(promotionSuggestion.offer.services as ServiceId[]))}
+                      >
+                        Complete bundle
+                      </Button>
+                    </div>
+                  </Card>
+                )}
+
+                {!isValidBundle && cmoSuggestion && (
+                  <Card className="mt-2 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+                    <div className="p-3 md:p-4 flex items-start gap-3">
+                      <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-amber-800 dark:text-amber-200">Smart suggestion</p>
+                        <p className="text-sm text-amber-900 dark:text-amber-100">{cmoSuggestion.message}</p>
+                        {cmoSuggestion.icons && cmoSuggestion.icons.length > 0 && (
+                          <div className="flex items-center gap-2 mt-2">
+                            {cmoSuggestion.icons.map(id => {
+                              const Icon = serviceDisplayConfig[id].Icon;
+                              return <Icon key={id} serviceid={id} className="w-5 h-5" />
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        className="rounded-full"
+                        onClick={() => setSelectedServices(new Set(cmoSuggestion.suggestedSelection))}
+                      >
+                        {cmoSuggestion.cta}
+                      </Button>
                     </div>
                   </Card>
                 )}
 
 
                 <div className="flex justify-between items-end pt-4 border-t mt-2 dark:border-gray-700">
-                    <span className="text-base font-semibold text-gray-800 dark:text-gray-200">Total (excl. VAT)</span>
+                     <span className="text-base font-semibold text-gray-800 dark:text-gray-200">Subtotal (excl. VAT)</span>
                     <span className="font-bold text-2xl text-primary">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : '0 THB'}</span>
                 </div>
             </div>
@@ -399,7 +571,7 @@ export default function AddBundlePage() {
                         disabled={selectedServices.size === 0}
                         onClick={handleNext}
                      >
-                        {selectedServices.size > 0 ? "Next" : "Choose your bundle"}
+                        {selectedServices.size > 0 ? "Continue" : "Start building"}
                     </Button>
                 </div>
             </div>
