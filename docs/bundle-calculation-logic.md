@@ -108,6 +108,48 @@ FUNCTION getPriceInfo(serviceToConsider, selectedServices):
 END
 ```
 
+## 3.1 Promotion Offer Badge
+
+This badge appears to encourage users to reach the next best-value exact bundle when the current selection is not an exact match.
+
+### When to show
+- Selected services count is less than 4 (there is room to add).
+- The current selection does not exactly match any `OfferGroup` (invalid selection).
+- There exists an exact `OfferGroup` that is a superset of the current selection.
+
+### Text & math
+Compute the following values where `currentSelection` is the set of currently selected services and `offers` is the list of all `OfferGroup`s:
+
+- **currentTotal**: `calculateTotal(currentSelection)` using original prices when selection is invalid.
+- **nextBundle**: the bundle that minimizes selling price subject to containing the current selection and not exceeding remaining slots:
+
+  \[\text{nextBundle} = \underset{offer\in offers}{\arg\min}\; offer.\text{sellingPrice}\quad \text{s.t.}\quad offer.\text{services} \supseteq currentSelection\ \land\ |offer.\text{services}| - |currentSelection| \le (4 - |currentSelection|)\]
+
+- **needCount**: \(|\text{nextBundle.services}| - |\text{currentSelection}|\)
+- **delta**: \(\text{nextBundle.sellingPrice} - \text{currentTotal}\)
+
+Render text:
+- If \(\delta > 0\):
+  "Add {needCount} more service(s) for just {delta} THB to get a discount!"
+- If \(\delta \le 0\):
+  "Add {needCount} more service(s) to pay only {nextBundle.sellingPrice} THB total (save {currentTotal − nextBundle.sellingPrice} THB)"
+
+### Display details
+- Find the cheapest `OfferGroup` that is a superset of the current selection. Example with YouTube + Netflix:
+  - Candidate supersets include `YouTube + Netflix`, `YouTube + Netflix + VIU`, `YouTube + Netflix + WeTV`; pick the minimum `sellingPrice` (e.g., `339 THB`).
+- Case found → show incremental text:
+  - If next bundle price is higher than `currentTotal`, show \(\Delta = \text{BundlePrice} - \text{CurrentTotal}\). Example: `61 THB`.
+  - If next bundle price is not higher, show bundle price and savings message as above.
+- Case not found → display: "No bundle for this combination".
+
+### Example
+- Current: `Netflix + YouTube = 278 THB` (invalid)
+- Cheapest next bundle: `YouTube + Netflix + VIU + WeTV = 339 THB`
+- \(\text{needCount} = 2\), \(\delta = 339 - 278 = 61\)
+- Badge: "Add 2 more service(s) for just 61 THB to get a discount!"
+
+If no next bundle exists → show the standard "No bundle for this combination" notice only.
+
 ### Step 2: Footer Summary Calculation
 
 The sticky footer at the bottom of the page provides a real-time summary of the user's monthly bill.

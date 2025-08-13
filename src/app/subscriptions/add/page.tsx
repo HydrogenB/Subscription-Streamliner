@@ -43,11 +43,11 @@ function getParentServiceName(serviceId: ServiceId): string {
 }
 
 const serviceGroups: Record<string, ServiceId[]> = subscriptionServices.reduce((acc, service) => {
-    const parentName = getParentServiceName(service.id);
+    const parentName = getParentServiceName(service.id as ServiceId);
     if (!acc[parentName]) {
         acc[parentName] = [];
     }
-    acc[parentName].push(service.id);
+    acc[parentName].push(service.id as ServiceId);
     return acc;
 }, {} as Record<string, ServiceId[]>);
 
@@ -85,7 +85,7 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
     if (!bestOffer || bestMatchLength < selectedArray.length) {
       for (const offer of offerGroups) {
         const offerServicesSorted = [...offer.services].sort();
-        if (offerServicesSorted.every(id => selectedArray.includes(id))) {
+        if (offerServicesSorted.every(id => selectedArray.includes(id as ServiceId))) {
            if (!bestOffer || offer.sellingPrice < bestOffer.sellingPrice || offer.services.length > bestMatchLength) {
               bestOffer = offer;
               bestMatchLength = offer.services.length;
@@ -168,6 +168,44 @@ export default function AddBundlePage() {
 
     return { total: 0, savings: 0, packName: "Choose your bundle", isValidBundle: false, fullPrice: 0 };
   }, [selectedServices]);
+
+  // Promotion Offer Badge suggestion (docs §3.1)
+  const promotionSuggestion = useMemo(() => {
+    if (selectedServices.size === 0) return null;
+    if (selectedServices.size >= MAX_SELECTION_LIMIT) return null;
+
+    // Show only when current selection is NOT an exact bundle
+    const matchedOffer = findBestOffer(selectedServices);
+    if (matchedOffer && matchedOffer.services.length === selectedServices.size) return null;
+
+    const currentSelection = Array.from(selectedServices) as ServiceId[];
+    const remainingSlots = MAX_SELECTION_LIMIT - currentSelection.length;
+
+    const candidates = offerGroups
+      .filter(o => currentSelection.every(id => o.services.includes(id as string)))
+      .map(o => ({ offer: o, addCount: o.services.length - currentSelection.length }))
+      .filter(x => x.addCount > 0 && x.addCount <= remainingSlots);
+
+    if (candidates.length === 0) return null;
+
+    const best = candidates.reduce((acc, cur) => cur.offer.sellingPrice < acc.offer.sellingPrice ? cur : acc);
+
+    const currentTotal = currentSelection.reduce((sum, id) => {
+      const svc = subscriptionServices.find(s => s.id === id);
+      return sum + (svc?.plans[0].price || 0);
+    }, 0);
+
+    const delta = best.offer.sellingPrice - currentTotal;
+    const needCount = best.addCount;
+
+    const message = delta > 0
+      ? `Add ${needCount} more service(s) for just ${delta.toFixed(0)} THB to get a discount!`
+      : `Add ${needCount} more service(s) to pay only ${best.offer.sellingPrice.toFixed(0)} THB total (save ${(currentTotal - best.offer.sellingPrice).toFixed(0)} THB)`;
+
+    const missing = best.offer.services.filter(id => !currentSelection.includes(id as ServiceId)) as ServiceId[];
+
+    return { offer: best.offer, needCount, delta, message, missing } as const;
+  }, [selectedServices]);
   
   const handleNext = () => {
     if (selectedServices.size === 0) return;
@@ -221,6 +259,34 @@ export default function AddBundlePage() {
           
           <div>
             <h2 className="text-xl font-bold text-center mb-4 mt-8">Or build your own bundle</h2>
+            {!isValidBundle && promotionSuggestion && (
+              <div className="mb-4">
+                <Card className="border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+                  <div className="p-3 md:p-4 flex items-start gap-3">
+                    <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-amber-800 dark:text-amber-200">Special Offer!</p>
+                      <p className="text-sm text-amber-900 dark:text-amber-100">{promotionSuggestion.message}</p>
+                      {promotionSuggestion.missing.length > 0 && (
+                        <div className="flex items-center gap-2 mt-2">
+                          {promotionSuggestion.missing.map(id => {
+                            const Icon = serviceDisplayConfig[id].Icon;
+                            return <Icon key={id} serviceid={id} className="w-5 h-5" />
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => setSelectedServices(new Set(promotionSuggestion.offer.services as ServiceId[]))}
+                    >
+                      Complete bundle
+                    </Button>
+                  </div>
+                </Card>
+              </div>
+            )}
             <div className="space-y-3">
               {allServices.map(service => (
                 <ServiceCard 
@@ -304,7 +370,7 @@ export default function AddBundlePage() {
                   </div>
                 )}
                 
-                {!isValidBundle && selectedServices.size > 0 && (
+                {!isValidBundle && selectedServices.size > 0 && !promotionSuggestion && (
                   <Card className="mt-4 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800">
                     <div className="p-3 flex items-center gap-3">
                       <AlertCircle className="w-5 h-5 text-destructive" />
@@ -354,10 +420,10 @@ interface ServiceCardProps {
 }
 
 function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServices }: ServiceCardProps) {
-    const parentName = getParentServiceName(service.id);
+    const parentName = getParentServiceName(service.id as ServiceId);
     const serviceGroup = serviceGroups[parentName];
-    const selectedPlanInGroup = serviceGroup.find(plan => selectedServices.has(plan));
-    const isPlanSwitch = selectedPlanInGroup && selectedPlanInGrup !== service.id;
+    const selectedPlanInGroup = serviceGroup.find((plan: ServiceId) => selectedServices.has(plan));
+    const isPlanSwitch = selectedPlanInGroup && selectedPlanInGroup !== service.id;
 
     const selectedParentServicesCount = new Set(Array.from(selectedServices).map(id => getParentServiceName(id))).size;
     const isDisabled = !isSelected && !selectedPlanInGroup && selectedParentServicesCount >= MAX_SELECTION_LIMIT;
