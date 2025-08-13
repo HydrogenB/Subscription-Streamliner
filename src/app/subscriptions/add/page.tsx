@@ -225,6 +225,7 @@ export default function AddBundlePage() {
       icons?: ServiceId[];
       newTotal: number;
       savings: number;
+      badge?: string;
     };
 
     const suggestions: Suggestion[] = [];
@@ -261,6 +262,7 @@ export default function AddBundlePage() {
             icons: Array.from(swapped) as ServiceId[],
             newTotal,
             savings,
+            badge: savings > 0 ? 'Best value' : (deltaUp <= 50 ? 'Small upgrade' : 'Unlock savings'),
           });
         }
       });
@@ -287,6 +289,7 @@ export default function AddBundlePage() {
           icons: Array.from(suggestedSelection),
           newTotal,
           savings,
+          badge: 'High impact',
         });
       }
     });
@@ -324,6 +327,7 @@ export default function AddBundlePage() {
         icons: promotionSuggestion.offer.services as ServiceId[],
         newTotal,
         savings,
+        badge: savings > 0 ? 'Great deal' : 'Unlock offer',
       });
     }
 
@@ -497,13 +501,19 @@ export default function AddBundlePage() {
                   </Card>
                 )}
 
-                {!isValidBundle && promotionSuggestion && (
-                  <Card className="mt-4 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+                {!isValidBundle && !cmoSuggestion && promotionSuggestion && (
+                  <Card 
+                    className="mt-4 border-amber-300 bg-amber-50 dark:bg-amber-900/20 cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedServices(new Set(promotionSuggestion.offer.services as ServiceId[]))}
+                  >
                     <div className="p-3 md:p-4 flex items-start gap-3">
                       <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
                       <div className="flex-1">
                         <p className="font-semibold text-amber-800 dark:text-amber-200">Limited-time offer</p>
                         <p className="text-sm text-amber-900 dark:text-amber-100">{promotionSuggestion.message}</p>
+                        <p className="text-xs text-amber-900/70 dark:text-amber-200/80 mt-1">Tap to apply</p>
                         {promotionSuggestion.missing.length > 0 && (
                           <div className="flex items-center gap-2 mt-2">
                             {promotionSuggestion.missing.map(id => {
@@ -513,24 +523,28 @@ export default function AddBundlePage() {
                           </div>
                         )}
                       </div>
-                      <Button
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() => setSelectedServices(new Set(promotionSuggestion.offer.services as ServiceId[]))}
-                      >
-                        Complete bundle
-                      </Button>
                     </div>
                   </Card>
                 )}
 
                 {!isValidBundle && cmoSuggestion && (
-                  <Card className="mt-2 border-amber-300 bg-amber-50 dark:bg-amber-900/20">
+                  <Card 
+                    className="mt-2 border-amber-300 bg-amber-50 dark:bg-amber-900/20 cursor-pointer"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setSelectedServices(new Set(cmoSuggestion.suggestedSelection))}
+                  >
                     <div className="p-3 md:p-4 flex items-start gap-3">
                       <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
                       <div className="flex-1">
-                        <p className="font-semibold text-amber-800 dark:text-amber-200">Smart suggestion</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-amber-800 dark:text-amber-200">Smart suggestion</p>
+                          {cmoSuggestion.badge && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 font-bold uppercase tracking-wide">{cmoSuggestion.badge}</span>
+                          )}
+                        </div>
                         <p className="text-sm text-amber-900 dark:text-amber-100">{cmoSuggestion.message}</p>
+                        <p className="text-xs text-amber-900/70 dark:text-amber-200/80 mt-1">Tap to apply</p>
                         {cmoSuggestion.icons && cmoSuggestion.icons.length > 0 && (
                           <div className="flex items-center gap-2 mt-2">
                             {cmoSuggestion.icons.map(id => {
@@ -540,13 +554,6 @@ export default function AddBundlePage() {
                           </div>
                         )}
                       </div>
-                      <Button
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() => setSelectedServices(new Set(cmoSuggestion.suggestedSelection))}
-                      >
-                        {cmoSuggestion.cta}
-                      </Button>
                     </div>
                   </Card>
                 )}
@@ -567,11 +574,16 @@ export default function AddBundlePage() {
                     </div>
                      <Button 
                         size="lg" 
-                        className="w-full bg-primary hover:bg-primary/90 rounded-full h-12 text-lg font-bold text-white" 
-                        disabled={selectedServices.size === 0}
+                        className={cn(
+                          "w-full rounded-full h-12 text-lg font-bold",
+                          selectedServices.size === 0 || !isValidBundle
+                            ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                            : "bg-primary hover:bg-primary/90 text-white"
+                        )}
+                        disabled={selectedServices.size === 0 || !isValidBundle}
                         onClick={handleNext}
                      >
-                        {selectedServices.size > 0 ? "Continue" : "Start building"}
+                        {selectedServices.size === 0 ? "Start building" : (isValidBundle ? "Continue" : "Choose a bundle to continue")}
                     </Button>
                 </div>
             </div>
@@ -614,11 +626,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
         };
 
         if (isSelected) {
-            return (
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                    <Check className="w-5 h-5 text-white" />
-                </div>
-            );
+            return null;
         }
         
         let incrementalCost: number;
@@ -675,9 +683,7 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
         isDisabled ? 'bg-gray-100 dark:bg-gray-700/50 border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-60' : 'cursor-pointer'
       )}
     >
-        <div className={cn("w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0", isSelected ? "bg-primary border-primary" : "border-gray-300 dark:border-gray-600")}>
-            {isSelected && <Check className="w-4 h-4 text-white" />}
-        </div>
+        <div className={cn("w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0", isSelected ? "bg-primary border-primary" : "border-gray-300 dark:border-gray-600")}></div>
 
         <Icon 
           serviceid={service.id}
