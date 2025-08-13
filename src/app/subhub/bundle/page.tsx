@@ -47,9 +47,9 @@ function BundleContent() {
               <Button
                 className="rounded-full"
                 disabled={serviceIds.length === 0}
-                onClick={() => router.push(`/subscriptions/confirm?services=${serviceIds.join(',')}`)}
+                onClick={() => router.push(`/subhub/checkout?bundle=${serviceIds.join(',')}`)}
               >
-                Continue to Confirm
+                Continue to Checkout
               </Button>
               <Button
                 variant="outline"

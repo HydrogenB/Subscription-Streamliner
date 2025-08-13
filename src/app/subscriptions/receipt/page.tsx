@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function ReceiptPage() {
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Header title="Purchase Receipt" />
+      <Header title="Thank you" />
       <main className="flex-grow p-4 md:p-6">
         <Suspense fallback={<ReceiptSkeleton />}>
           <ReceiptContent />

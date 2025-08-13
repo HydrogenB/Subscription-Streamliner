@@ -346,7 +346,7 @@ export default function AddBundlePage() {
   const handleNext = () => {
     if (selectedServices.size === 0) return;
     const serviceIds = Array.from(selectedServices).join(',');
-    router.push(`/subscriptions/confirm?services=${serviceIds}`);
+    router.push(`/subhub/checkout?bundle=${serviceIds}`);
   };
 
   const plugin = useRef(
