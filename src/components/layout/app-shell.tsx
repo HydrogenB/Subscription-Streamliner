@@ -9,7 +9,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const noHeaderFooterRoutes = [
     '/subscriptions/add',
-    '/subscriptions/confirm',
+    '/subhub/checkout',
     '/subscriptions/receipt',
   ];
   

@@ -6,9 +6,9 @@ import { useMemo } from 'react';
 import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { OfferGroup, ServiceId } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle2, Home, FileText } from 'lucide-react';
+import { Home } from 'lucide-react';
 
 const serviceDisplayConfig: Record<ServiceId, { title: string }> = {
   youtube: { title: 'Youtube Premium' },
@@ -68,64 +68,59 @@ export function ReceiptContent() {
   
   if (!orderId || serviceIds.length === 0) {
     return (
-      <Card className="text-center shadow-lg">
-        <CardHeader>
-          <CardTitle>Invalid Receipt</CardTitle>
-          <CardDescription>This receipt is invalid or has expired. Please start a new purchase.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={() => router.push('/')} className="rounded-full">
-            <Home className="mr-2" /> Go Home
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="text-center space-y-4">
+        <p className="text-lg font-semibold">Invalid receipt</p>
+        <Button onClick={() => router.push('/')} className="rounded-full">
+          <Home className="mr-2" /> Go Home
+        </Button>
+      </div>
     );
   }
 
   return (
     <div className="space-y-6">
-        <div className="flex flex-col items-center text-center space-y-2">
-            <CheckCircle2 className="h-16 w-16 text-green-500" />
-            <h1 className="text-2xl font-bold">Thank You For Your Purchase!</h1>
-            <p className="text-muted-foreground">Your new subscriptions are now active.</p>
-        </div>
-
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle>Receipt</CardTitle>
-          <CardDescription>
-            Order ID: <span className="font-mono text-foreground">{orderId}</span>
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h3 className="font-semibold mb-2">Purchased Services</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-                {serviceIds.map(id => (
-                    <li key={id} className="font-medium text-gray-700 dark:text-gray-300">• {serviceDisplayConfig[id].title}</li>
-                ))}
-            </ul>
+      <Card className="shadow-sm">
+        <CardContent className="space-y-6 p-6">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-red-600 font-bold">True5G Postpaid</span>
+            <span className="text-xl font-semibold">0900000000</span>
           </div>
 
-          <Separator />
-          
-          <div className="flex justify-between items-baseline font-bold text-lg">
-            <span>Amount Paid</span>
-            <span className="text-primary">{total.toFixed(2)} THB</span>
+          <div className="space-y-4">
+            <div>
+              <p className="font-bold text-lg">auto-renew package</p>
+              <ul className="list-disc pl-5 space-y-1 text-lg">
+                {serviceIds.map(id => (
+                  <li key={id}>{serviceDisplayConfig[id].title}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="space-y-1">
+              <p className="font-semibold text-lg">Order date</p>
+              <p className="text-lg">{new Date().toLocaleString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: false, timeZoneName: 'short' })}</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="font-semibold text-lg">Total cost</p>
+              <p className="text-xl font-bold">{(total / 1.07).toFixed(2)} THB (Excl. VAT)</p>
+            </div>
+
+            <div className="space-y-1">
+              <p className="font-semibold text-lg">Payment method</p>
+              <p className="text-lg">True Bill</p>
+            </div>
           </div>
         </CardContent>
       </Card>
-      
-        <div className="flex flex-col space-y-2">
-            <Button size="lg" onClick={() => router.push('/account')} className="rounded-full font-bold">
-                <FileText className="mr-2"/>
-                View My Subscriptions
-            </Button>
-            <Button size="lg" variant="outline" onClick={() => router.push('/')} className="rounded-full font-bold">
-                <Home className="mr-2"/>
-                Back to Home
-            </Button>
-        </div>
+
+      <p className="text-muted-foreground">The purchased package will be active after your received SMS.</p>
+
+      <div className="pt-8">
+        <Button size="lg" className="w-full h-12 rounded-full text-lg font-bold" onClick={() => router.push('/account')}>
+          Go to my subscriptions
+        </Button>
+      </div>
     </div>
   );
 }
