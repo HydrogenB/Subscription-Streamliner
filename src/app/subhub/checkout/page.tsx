@@ -1,141 +1,261 @@
 'use client';
 
-import { Suspense, useMemo } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { Header } from '@/components/layout/header';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { useState, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import type { ServiceId } from '@/lib/types';
-import { subscriptionServices, offerGroups } from '@/lib/data';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
+import { subscriptionServices, offerGroups } from '@/lib/data';
+import type { SubscriptionService, OfferGroup, ServiceId } from '@/lib/types';
 import { NetflixIcon } from '@/components/icons/netflix-icon';
 import { YouTubeIcon } from '@/components/icons/youtube-icon';
 import { ViuIcon } from '@/components/icons/viu-icon';
-import { WeTVIcon } from '@/components/icons/wetv-icon';
 import { IQIYIIcon } from '@/components/icons/iqiyi-icon';
+import { WeTVIcon } from '@/components/icons/wetv-icon';
 import { OneDIcon } from '@/components/icons/oned-icon';
 import { TrueIDIcon } from '@/components/icons/trueid-icon';
 
-const serviceDisplayConfig: Record<ServiceId, { title: string; Icon: React.ElementType }> = {
-  youtube: { title: 'Youtube premium', Icon: YouTubeIcon },
-  viu: { title: 'VIU', Icon: ViuIcon },
-  'netflix-mobile': { title: 'Netflix mobile', Icon: NetflixIcon },
-  iqiyi: { title: 'iQIYI VIP Standard', Icon: IQIYIIcon },
-  wetv: { title: 'WeTV', Icon: WeTVIcon },
-  oned: { title: 'oneD', Icon: OneDIcon },
-  trueplus: { title: 'True Plus', Icon: TrueIDIcon },
-  trueidshort: { title: 'True ID Short', Icon: TrueIDIcon },
-  'netflix-basic': { title: 'Netflix Basic', Icon: NetflixIcon },
-  'netflix-standard': { title: 'Netflix Standard', Icon: NetflixIcon },
-  'netflix-premium': { title: 'Netflix Premium', Icon: NetflixIcon },
+const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: string; details: string }> = {
+  youtube: { Icon: YouTubeIcon, title: 'Youtube premium', details: '480p, 1 screen, 1 device' },
+  viu: { Icon: ViuIcon, title: 'VIU', details: '480p, 1 screen, 1 device' },
+  'netflix-mobile': { Icon: NetflixIcon, title: 'Netflix Mobile', details: '480p, 1 screen, 1 device' },
+  iqiyi: { Icon: IQIYIIcon, title: 'iQIYI VIP Standard', details: '480p, 1 screen, 1 device' },
+  wetv: { Icon: WeTVIcon, title: 'WeTV', details: '480p, 1 screen, 1 device' },
+  oned: { Icon: OneDIcon, title: 'OneD', details: '480p, 1 screen, 1 device' },
+  trueplus: { Icon: TrueIDIcon, title: 'True Plus', details: '480p, 1 screen, 1 device' },
+  trueidshort: { Icon: TrueIDIcon, title: 'True ID Short', details: '480p, 1 screen, 1 device' },
+  'netflix-basic': { Icon: NetflixIcon, title: 'Netflix Basic', details: '480p, 1 screen, 1 device' },
+  'netflix-standard': { Icon: NetflixIcon, title: 'Netflix Standard', details: '480p, 1 screen, 1 device' },
+  'netflix-premium': { Icon: NetflixIcon, title: 'Netflix Premium', details: '480p, 1 screen, 1 device' },
 };
 
-function parseBundleParam(raw: string | null): ServiceId[] {
-  if (!raw) return [] as ServiceId[];
-  const ids = raw.split(',').map((id) => id.trim()).filter(Boolean);
-  const validIds = new Set(subscriptionServices.map((s) => s.id));
-  return ids.filter((id) => validIds.has(id)) as ServiceId[];
-}
-
-function findExactBundlePrice(ids: ServiceId[]): number | null {
-  if (ids.length === 0) return null;
-  const sorted = [...ids].sort();
-  const match = offerGroups.find(o => o.services.length === sorted.length && [...o.services].sort().every((id, i) => id === sorted[i]));
-  return match ? match.sellingPrice : null;
-}
-
-function CheckoutContent() {
-  const searchParams = useSearchParams();
+export default function CheckoutPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const bundleParam = searchParams.get('bundle');
+  const [activeTab, setActiveTab] = useState('information');
 
-  const serviceIds = useMemo(() => parseBundleParam(searchParams.get('bundle')), [searchParams]);
-  const bundlePrice = useMemo(() => findExactBundlePrice(serviceIds), [serviceIds]);
-  const fallbackPrice = useMemo(() => serviceIds.reduce((sum, id) => sum + (subscriptionServices.find(s => s.id === id)?.plans[0].price || 0), 0), [serviceIds]);
-  const price = bundlePrice ?? fallbackPrice;
+  const selectedServices = useMemo(() => {
+    if (!bundleParam) return [];
+    return bundleParam.split(',').filter(Boolean) as ServiceId[];
+  }, [bundleParam]);
+
+  const bundleDetails = useMemo(() => {
+    if (selectedServices.length === 0) return null;
+
+    // Find the best offer for the selected services
+    const matchedOffer = offerGroups.find(offer => {
+      const offerServices = offer.services as ServiceId[];
+      return offerServices.length === selectedServices.length && 
+             offerServices.every(id => selectedServices.includes(id));
+    });
+
+    if (matchedOffer) {
+      return {
+        services: selectedServices,
+        price: matchedOffer.sellingPrice,
+        originalPrice: matchedOffer.fullPrice,
+        savings: matchedOffer.fullPrice - matchedOffer.sellingPrice
+      };
+    }
+
+    // Fallback to individual pricing
+    const totalPrice = selectedServices.reduce((acc, id) => {
+      const service = subscriptionServices.find(s => s.id === id);
+      return acc + (service?.plans[0].price || 0);
+    }, 0);
+
+    return {
+      services: selectedServices,
+      price: totalPrice,
+      originalPrice: totalPrice,
+      savings: 0
+    };
+  }, [selectedServices]);
+
+  const handleCheckout = () => {
+    // Navigate to payment/confirmation page
+    router.push('/subscriptions/confirm');
+  };
+
+  if (!bundleDetails) {
+    return (
+      <div className="flex flex-col min-h-screen bg-gray-50">
+        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center">
+          <button 
+            onClick={() => router.back()}
+            className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </button>
+          <h1 className="text-lg font-semibold text-gray-900 ml-2">Subscription plan</h1>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-gray-500">No bundle selected</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Header showBackButton title="Subscription plan" />
-      <main className="flex-grow p-4 md:p-6 max-w-xl mx-auto w-full">
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <h2 className="text-lg font-bold">Bundle subscription</h2>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-4">
-              {serviceIds.map((id) => {
-                const service = subscriptionServices.find(s => s.id === id);
-                if (!service) return null;
-                const { title, Icon } = serviceDisplayConfig[id];
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center">
+        <button 
+          onClick={() => router.back()}
+          className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-gray-600" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 ml-2">Subscription plan</h1>
+      </div>
+
+      <main className="flex-1 overflow-y-auto pb-32">
+        <div className="p-4 space-y-6">
+          
+          {/* Bundle subscription card */}
+          <Card className="p-6">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Bundle subscription</h2>
+            
+            {/* Services list */}
+            <div className="space-y-4 mb-6">
+              {bundleDetails.services.map(serviceId => {
+                const Icon = serviceDisplayConfig[serviceId]?.Icon;
+                const title = serviceDisplayConfig[serviceId]?.title;
+                const details = serviceDisplayConfig[serviceId]?.details;
+                
+                if (!Icon || !title) return null;
+
                 return (
-                  <div key={id} className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg bg-white border flex items-center justify-center">
-                      <Icon serviceid={id} className="w-7 h-7" />
+                  <div key={serviceId} className="flex items-center gap-4">
+                    {/* Service Icon */}
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                      <Icon serviceid={serviceId} className="w-8 h-8" />
                     </div>
+                    
+                    {/* Service Details */}
                     <div className="flex-1">
-                      <p className="font-semibold text-gray-900 dark:text-gray-100">{title}</p>
-                      <p className="text-muted-foreground text-sm">480p, 1 screen, 1 device</p>
+                      <h3 className="font-semibold text-gray-900">{title}</h3>
+                      <p className="text-sm text-gray-600">{details}</p>
                     </div>
                   </div>
                 );
               })}
             </div>
-            <div className="pt-2">
-              <p className="text-4xl font-extrabold text-red-600">{price.toFixed(0)}<span className="ml-2 text-base align-top">THB/month</span></p>
-              <p className="text-xs text-muted-foreground mt-1">EXCL. VAT</p>
-            </div>
-          </CardContent>
-        </Card>
 
-        <div className="mt-6">
-          <Tabs defaultValue="info" className="w-full">
-            <TabsList className="grid grid-cols-2 bg-transparent">
-              <TabsTrigger value="info" className="data-[state=active]:font-bold data-[state=active]:text-primary">Information</TabsTrigger>
-              <TabsTrigger value="terms" className="data-[state=active]:font-bold data-[state=active]:text-primary">Terms of service</TabsTrigger>
-            </TabsList>
-            <Separator className="my-2" />
-            <TabsContent value="info" className="text-sm">
-              <ul className="list-disc pl-5 space-y-2">
-                <li>Get extra 100 minutes from normal 200 minutes</li>
-                <li>Price does not include VAT</li>
-                <li>Check out GO+ Gifts for more details</li>
-                <li>Free calls to any number 300 minutes at only 199 THB, valid for 30 days.</li>
-                <li>The company reserves the right to cancel the promotion/change the bonus/conditions without prior notice.</li>
-                <li>In the event of a dispute, the company’s decision is an ultimatum.</li>
-              </ul>
-            </TabsContent>
-            <TabsContent value="terms" className="text-sm">
-              <ul className="list-disc pl-5 space-y-2">
-                <li>All subscriptions renew monthly until canceled.</li>
-                <li>VAT will be applied at checkout where applicable.</li>
-                <li>Usage is subject to individual service provider policies.</li>
-              </ul>
-            </TabsContent>
-          </Tabs>
+            {/* Bundle Price */}
+            <div className="border-t pt-4">
+              <div className="text-center">
+                <div className="text-4xl font-bold text-red-600 mb-1">
+                  {bundleDetails.price}
+                </div>
+                <div className="text-lg text-red-600 mb-2">THB/month</div>
+                <div className="text-sm text-gray-500">EXCL. VAT</div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Information/Terms tabs */}
+          <Card className="p-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger 
+                  value="information" 
+                  className={activeTab === 'information' ? 'bg-red-600 text-white' : ''}
+                >
+                  Information
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="terms" 
+                  className={activeTab === 'terms' ? 'bg-red-600 text-white' : ''}
+                >
+                  Terms of service
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="information" className="mt-4">
+                <div className="space-y-3 text-sm text-gray-700">
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>Get extra 100 minutes from normal 200 minutes</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>Price does not include VAT</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>Check out GO+ Gifts for more details</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>Free calls to any number 300 minutes at only 199 THB, valid for 30 days.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>The company reserves the right to cancel the promotion/change the bonus/conditions without prior notice.</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>In the event of a dispute, the company's decision is an ultimatum.</span>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="terms" className="mt-4">
+                <div className="space-y-3 text-sm text-gray-700">
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>This subscription will automatically renew monthly unless cancelled</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>You can cancel your subscription at any time through your account settings</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>All services are subject to their respective terms and conditions</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>Prices may change with 30 days notice</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-red-600 mt-1">•</span>
+                    <span>Service availability may vary by region</span>
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </Card>
         </div>
       </main>
 
-      <footer className="sticky bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t">
-        <div className="max-w-xl mx-auto w-full p-4 flex items-center justify-between gap-3">
+      {/* Bottom checkout bar */}
+      <div className="fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-200 px-4 py-4">
+        <div className="max-w-md mx-auto flex items-center justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">Total Excl. VAT</p>
-            <p className="text-xl font-extrabold text-primary">{price.toFixed(0)} <span className="text-sm font-semibold">THB/month</span></p>
+            <div className="text-sm text-gray-600">Total Excl. VAT</div>
+            <div className="text-2xl font-bold text-red-600">
+              {bundleDetails.price} THB/month
+            </div>
           </div>
-          <Button className="rounded-full h-12 px-6 text-lg font-bold" onClick={() => router.push(`/subscriptions/receipt?orderId=ORD-${Date.now()}&services=${serviceIds.join(',')}`)}>
+          <Button 
+            size="lg" 
+            className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg font-semibold"
+            onClick={handleCheckout}
+          >
             Checkout
           </Button>
         </div>
-      </footer>
+        
+        {/* Home indicator */}
+        <div className="max-w-md mx-auto mt-2">
+          <div className="w-32 h-1 bg-black rounded-full mx-auto"></div>
+        </div>
+      </div>
     </div>
-  );
-}
-
-export default function SubhubCheckoutPage() {
-  return (
-    <Suspense fallback={null}>
-      <CheckoutContent />
-    </Suspense>
   );
 }
 

@@ -7,7 +7,7 @@ import { Header } from '@/components/layout/header';
 import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { SubscriptionService, OfferGroup, ServiceId } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { ChevronUp, AlertCircle, Check } from 'lucide-react';
+import { ChevronUp, AlertCircle, Check, ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NetflixIcon } from '@/components/icons/netflix-icon';
 import { YouTubeIcon } from '@/components/icons/youtube-icon';
@@ -38,6 +38,11 @@ const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: 
 function getParentServiceName(serviceId: ServiceId): string {
     const service = subscriptionServices.find(s => s.id === serviceId);
     if (!service) return serviceId;
+    
+    // Special handling for True services to keep them independent
+    if (serviceId === 'trueplus') return 'TruePlus';
+    if (serviceId === 'trueidshort') return 'TrueIDShort';
+    
     // Extracts the base name, e.g., "Netflix" from "Netflix Mobile"
     return service.name.split(' ')[0];
 }
@@ -50,7 +55,6 @@ const serviceGroups: Record<string, ServiceId[]> = subscriptionServices.reduce((
     acc[parentName].push(service.id as ServiceId);
     return acc;
 }, {} as Record<string, ServiceId[]>);
-
 
 function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
     if (selectedIds.size === 0) {
@@ -97,6 +101,8 @@ function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
     return bestOffer;
 }
 
+
+
 const MAX_SELECTION_LIMIT = 4;
 
 const allServices = subscriptionServices;
@@ -106,6 +112,33 @@ const heroBundles = [
   offerGroups.find(o => o.id === 'offerGroup63'), // Viu + WeTV + Netflix Mobile + YouTube
 ].filter(Boolean) as OfferGroup[];
 
+// Promotional offers for the carousel
+const promotionalOffers = [
+  {
+    id: 'promo1',
+    title: 'แพ็กสุดคุ้ม! กับ 4 บริการฮิต เพียง 449.-',
+    services: ['oned', 'trueplus', 'trueidshort', 'youtube'],
+    price: 449,
+    originalPrice: 59 + 119 + 90 + 179, // 447 THB
+    badge: 'Best Value'
+  },
+  {
+    id: 'promo2',
+    title: 'กรทั่ว ทั้งถูก จ่าย',
+    services: ['netflix-standard', 'viu', 'iqiyi', 'wetv'],
+    price: 399,
+    originalPrice: 299 + 89 + 89 + 59, // 536 THB
+    badge: 'Limited Time'
+  },
+  {
+    id: 'promo3',
+    title: 'Premium Streaming Pack - Only 599.-',
+    services: ['netflix-premium', 'youtube', 'viu', 'iqiyi'],
+    price: 599,
+    originalPrice: 419 + 179 + 89 + 89, // 776 THB
+    badge: 'Premium'
+  }
+];
 
 export default function AddBundlePage() {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set([]));
@@ -350,242 +383,305 @@ export default function AddBundlePage() {
   };
 
   const plugin = useRef(
-    Autoplay({ delay: 3000, stopOnInteraction: true })
+    Autoplay({ delay: 4000, stopOnInteraction: true })
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Header showBackButton title="Create your bundle" />
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* Custom Header matching the reference UI */}
+      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center">
+        <button 
+          onClick={() => router.back()}
+          className="p-2 -ml-2 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          <ArrowLeft className="w-5 h-5 text-gray-600" />
+        </button>
+        <h1 className="text-lg font-semibold text-gray-900 ml-2">Subscription hub</h1>
+      </div>
+
       <main className="flex-grow overflow-y-auto pb-48">
         <div className="p-4 space-y-6">
           
-          {heroBundles.length > 0 && (
-            <div>
-              <h2 className="text-xl font-bold text-center">Top picks</h2>
-              <p className="text-muted-foreground text-center mb-4">Our most popular bundles—curated for the best value.</p>
-              <Carousel
-                plugins={[plugin.current]}
-                opts={{
-                    align: "start",
-                    loop: true,
-                }}
-                className="w-full max-w-sm mx-auto"
-                onMouseEnter={plugin.current.stop}
-                onMouseLeave={plugin.current.reset}
-              >
-                  <CarouselContent>
-                      {heroBundles.map((bundle) => (
-                          <CarouselItem key={bundle.id} className="basis-11/12">
-                              <div className="p-1 h-full">
-                                <OfferCard 
-                                    offer={bundle} 
-                                    allServices={allServices} 
-                                    onSelect={() => {
-                                      setSelectedServices(new Set(bundle.services as ServiceId[]));
-                                      setIsSummaryOpen(true);
-                                    }} 
-                                  />
-                              </div>
-                          </CarouselItem>
-                      ))}
-                  </CarouselContent>
-              </Carousel>
-            </div>
-          )}
-          
-          <div>
-            <h2 className="text-xl font-bold text-center mb-4 mt-8">Or create your own</h2>
-            {selectedServices.size === 0 && (
-              <div className="mb-4">
-                <Card className="border-gray-200 bg-white dark:bg-gray-800">
-                  <div className="p-3 md:p-4 flex items-start gap-3">
-                    <div className="shrink-0 w-5 h-5 rounded-full bg-gray-300 dark:bg-gray-600" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-900 dark:text-gray-100">Pick your services to unlock bundle savings.</p>
-                      <p className="text-sm text-muted-foreground">Choose up to 4 different services. We’ll automatically apply the best deal.</p>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            )}
-            {/* Special Offer moved to bottom sheet */}
-            <div className="space-y-3">
-              {allServices.map(service => (
-                <ServiceCard 
-                  key={service.id}
-                  service={service}
-                  Icon={serviceDisplayConfig[service.id as ServiceId].Icon}
-                  title={serviceDisplayConfig[service.id as ServiceId].title}
-                  isSelected={selectedServices.has(service.id as ServiceId)}
-                  onToggle={() => handleServiceToggle(service.id as ServiceId)}
-                  selectedServices={selectedServices}
+          {/* Promotional Carousel matching the reference UI */}
+          <div className="mb-6">
+            <Carousel
+              plugins={[plugin.current]}
+              opts={{
+                  align: "start",
+                  loop: true,
+              }}
+              className="w-full"
+              onMouseEnter={plugin.current.stop}
+              onMouseLeave={plugin.current.reset}
+            >
+                <CarouselContent>
+                    {promotionalOffers.map((offer, index) => (
+                        <CarouselItem key={offer.id} className="basis-full">
+                            <div className="p-1">
+                              <Card className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 relative overflow-hidden">
+                                <div className="relative z-10">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <span className="bg-white/20 text-white text-xs px-2 py-1 rounded-full font-medium">
+                                      {offer.badge}
+                                    </span>
+                                  </div>
+                                  <h3 className="text-lg font-bold mb-3 leading-tight">
+                                    {offer.title}
+                                  </h3>
+                                  <div className="flex items-center gap-3 mb-3">
+                                    {offer.services.map(serviceId => {
+                                      const Icon = serviceDisplayConfig[serviceId as ServiceId]?.Icon;
+                                      return Icon ? (
+                                        <div key={serviceId} className="bg-white/20 rounded-lg p-2">
+                                          <Icon serviceid={serviceId} className="w-6 h-6" />
+                                        </div>
+                                      ) : null;
+                                    })}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-2xl font-bold">{offer.price}.-</span>
+                                    <span className="text-white/70 line-through">{offer.originalPrice}.-</span>
+                                  </div>
+                                </div>
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16"></div>
+                              </Card>
+                            </div>
+                        </CarouselItem>
+                    ))}
+                </CarouselContent>
+            </Carousel>
+            
+            {/* Carousel dots */}
+            <div className="flex justify-center mt-4 gap-2">
+              {promotionalOffers.map((_, index) => (
+                <div
+                  key={index}
+                  className={cn(
+                    "w-2 h-2 rounded-full transition-colors",
+                    index === 0 ? "bg-red-500" : "bg-gray-300"
+                  )}
                 />
               ))}
             </div>
           </div>
+          
+          {/* Section heading matching the reference UI */}
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-bold text-gray-900">
+              Buy up to 4 to get a special price!
+            </h2>
+          </div>
+          
+          {/* Individual service cards matching the reference UI */}
+          <div className="space-y-3">
+            {allServices.map(service => (
+              <ServiceCard 
+                key={service.id}
+                service={service}
+                Icon={serviceDisplayConfig[service.id as ServiceId].Icon}
+                title={serviceDisplayConfig[service.id as ServiceId].title}
+                isSelected={selectedServices.has(service.id as ServiceId)}
+                onToggle={() => handleServiceToggle(service.id as ServiceId)}
+                selectedServices={selectedServices}
+              />
+            ))}
+          </div>
         </div>
       </main>
 
+      {/* Footer with summary - matching reference UI exactly */}
       <footer className="fixed bottom-0 left-0 right-0 z-10 w-full max-w-md mx-auto">
-        <div
-          onClick={() => setIsSummaryOpen(prev => !prev)}
-          className={cn("bg-white dark:bg-gray-800 rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out cursor-pointer", isSummaryOpen && "pb-safe-bottom")}
-        >
-          <div className="px-4 py-3 flex justify-between items-center w-full">
-              <div className="flex items-center gap-2">
-                    <h3 className="font-semibold text-base text-gray-800 dark:text-gray-200">
-                     Your monthly total
-                    </h3>
-                   <ChevronUp className={cn("w-5 h-5 text-gray-500 transition-transform", !isSummaryOpen && "rotate-180")} />
-              </div>
-              <div className="flex items-center gap-3">
-                   {savings > 0 && (
-                      <span className="text-sm font-semibold text-green-600">You save {savings.toFixed(0)} THB</span>
-                   )}
-                  <span className="font-bold text-lg text-primary">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : `0 THB`}</span>
-              </div>
+        <div className="bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)]">
+          {/* Top handle and header */}
+          <div className="px-4 py-3 flex justify-between items-center w-full cursor-pointer" onClick={() => setIsSummaryOpen(prev => !prev)}>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-base text-gray-800">
+                สรุปค่าบริการรายเดือน
+              </h3>
+              <ChevronUp className={cn("w-5 h-5 text-gray-500 transition-transform", !isSummaryOpen && "rotate-180")} />
+            </div>
+            <div className="flex items-center gap-3">
+              {savings > 0 && (
+                <span className="text-sm font-semibold text-green-600">ส่วนลดสูงสุด {savings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป</span>
+              )}
+              <span className="font-bold text-lg text-red-600">{selectedServices.size > 0 ? `${total.toFixed(0)} บาท` : `0 บาท`}</span>
+            </div>
           </div>
           
+          {/* Collapsible content */}
           <div className={cn("overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
-             <div className="px-4 pb-4 space-y-4">
-                
-                 {selectedServices.size > 0 ? (
-                  <div className="space-y-4 pt-2">
+            <div className="px-4 pb-4 space-y-4">
+              
+              {selectedServices.size > 0 ? (
+                <div className="space-y-4 pt-2">
+                   {/* Promotional banner matching reference UI exactly */}
+                   {savings > 0 && (
+                     <div className="bg-gradient-to-r from-purple-600 to-pink-500 text-white p-4 rounded-lg">
+                       <p className="text-center font-bold text-lg">
+                         {selectedServices.size === 4 
+                           ? `ยินดีด้วย! คุณได้รับส่วนลดสูงสุด ${savings.toFixed(0)} บาท!`
+                           : `ส่วนลดสูงสุด ${savings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป`
+                         }
+                       </p>
+                     </div>
+                   )}
+                  
+                  {/* Services list matching reference UI */}
+                  <div>
+                    <h4 className="font-bold text-gray-800 mb-2 text-base">บริการของคุณ</h4>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      {Array.from(selectedServices).map(id => {
+                        const service = subscriptionServices.find(s => s.id === id);
+                        if (!service) return null;
+                        const individualPrice = service.plans[0].price;
+                        return (
+                          <li key={id} className="flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                              <div className="w-5 flex justify-center">•</div>
+                              <span>{serviceDisplayConfig[id as ServiceId].title}</span>
+                            </div>
+                            <span className={cn(savings > 0 && "text-muted-foreground line-through")}>{individualPrice.toFixed(0)} THB</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                  
+                  {/* Bundle discount section */}
+                  {savings > 0 && (
                     <div>
-                       <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">Your selection</h4>
-                      <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                        {Array.from(selectedServices).map(id => {
-                          const service = subscriptionServices.find(s => s.id === id);
-                          if (!service) return null;
-                          const individualPrice = service.plans[0].price;
-                          return (
-                            <li key={id} className="flex justify-between items-center">
-                              <div className="flex items-center gap-2">
-                                <div className="w-5 flex justify-center">•</div>
-                                <span>{serviceDisplayConfig[id as ServiceId].title}</span>
-                              </div>
-                              <span className={cn(savings > 0 && "text-muted-foreground line-through")}>{individualPrice.toFixed(0)} THB</span>
-                            </li>
-                          );
-                        })}
+                      <h4 className="font-bold text-gray-800 mb-2 text-base">ส่วนลดแพ็กเกจ</h4>
+                      <ul className="space-y-1.5 text-sm">
+                        <li className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 flex justify-center">•</div>
+                            <span className="text-gray-700">ส่วนลดอัตโนมัติ</span>
+                          </div>
+                          <span className="font-medium text-green-600">-{savings.toFixed(0)} บาท</span>
+                        </li>
                       </ul>
                     </div>
-                
-                    {savings > 0 && (
-                       <div>
-                         <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">Bundle discount</h4>
-                        <ul className="space-y-1.5 text-sm">
-                          <li className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                              <div className="w-5 flex justify-center"></div>
-                             <span className="text-gray-700 dark:text-gray-300">Auto-applied savings</span>
-                            </div>
-                            <span className="font-medium text-green-600">-{savings.toFixed(0)} THB</span>
-                          </li>
-                        </ul>
-                      </div>
-                    )}
+                  )}
+                  
+                  {/* Additional text from reference UI exactly */}
+                  <div className="text-center py-2">
+                    <p className="text-sm text-gray-600">
+                      + เพิ่มบริการเพื่อรับส่วนลด (ไม่บังคับเลือก)
+                    </p>
                   </div>
-                ) : (
-                  <div className="text-center py-4 text-muted-foreground">
-                    Select at least one service to get started.
-                  </div>
-                )}
-                
-                {!isValidBundle && selectedServices.size > 0 && !promotionSuggestion && !cmoSuggestion && (
-                  <Card className="mt-4 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800">
-                    <div className="p-3 flex items-center gap-3">
-                      <AlertCircle className="w-5 h-5 text-destructive" />
-                      <p className="text-sm text-destructive">No bundle found for this mix. Try a different combination to save more.</p>
-                    </div>
-                  </Card>
-                )}
-
-                {!isValidBundle && !cmoSuggestion && promotionSuggestion && (
-                  <Card 
-                    className="mt-4 border-amber-300 bg-amber-50 dark:bg-amber-900/20 cursor-pointer"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedServices(new Set(promotionSuggestion.offer.services as ServiceId[]))}
-                  >
-                    <div className="p-3 md:p-4 flex items-start gap-3">
-                      <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
-                      <div className="flex-1">
-                        <p className="font-semibold text-amber-800 dark:text-amber-200">Limited-time offer</p>
-                        <p className="text-sm text-amber-900 dark:text-amber-100">{promotionSuggestion.message}</p>
-                        <p className="text-xs text-amber-900/70 dark:text-amber-200/80 mt-1">Tap to apply</p>
-                        {promotionSuggestion.missing.length > 0 && (
-                          <div className="flex items-center gap-2 mt-2">
-                            {promotionSuggestion.missing.map(id => {
-                              const Icon = serviceDisplayConfig[id].Icon;
-                              return <Icon key={id} serviceid={id} className="w-5 h-5" />
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                )}
-
-                {!isValidBundle && cmoSuggestion && (
-                  <Card 
-                    className="mt-2 border-amber-300 bg-amber-50 dark:bg-amber-900/20 cursor-pointer"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => setSelectedServices(new Set(cmoSuggestion.suggestedSelection))}
-                  >
-                    <div className="p-3 md:p-4 flex items-start gap-3">
-                      <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold text-amber-800 dark:text-amber-200">Smart suggestion</p>
-                          {cmoSuggestion.badge && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 font-bold uppercase tracking-wide">{cmoSuggestion.badge}</span>
-                          )}
-                        </div>
-                        <p className="text-sm text-amber-900 dark:text-amber-100">{cmoSuggestion.message}</p>
-                        <p className="text-xs text-amber-900/70 dark:text-amber-200/80 mt-1">Tap to apply</p>
-                        {cmoSuggestion.icons && cmoSuggestion.icons.length > 0 && (
-                          <div className="flex items-center gap-2 mt-2">
-                            {cmoSuggestion.icons.map(id => {
-                              const Icon = serviceDisplayConfig[id].Icon;
-                              return <Icon key={id} serviceid={id} className="w-5 h-5" />
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
-                )}
-
-
-                <div className="flex justify-between items-end pt-4 border-t mt-2 dark:border-gray-700">
-                     <span className="text-base font-semibold text-gray-800 dark:text-gray-200">Subtotal (excl. VAT)</span>
-                    <span className="font-bold text-2xl text-primary">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : '0 THB'}</span>
                 </div>
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  เลือกบริการอย่างน้อย 1 รายการเพื่อเริ่มต้น
+                </div>
+              )}
+              
+              {/* Suggestions and alerts */}
+              {!isValidBundle && selectedServices.size > 0 && !promotionSuggestion && !cmoSuggestion && (
+                <Card className="mt-4 bg-red-50 border-red-200">
+                  <div className="p-3 flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 text-destructive" />
+                    <p className="text-sm text-destructive">ไม่พบแพ็กเกจสำหรับการเลือกนี้ ลองเลือกแบบอื่นเพื่อประหยัดมากขึ้น</p>
+                  </div>
+                </Card>
+              )}
+
+              {!isValidBundle && !cmoSuggestion && promotionSuggestion && (
+                <Card 
+                  className="mt-4 border-amber-300 bg-amber-50 cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedServices(new Set(promotionSuggestion.offer.services as ServiceId[]))}
+                >
+                  <div className="p-3 md:p-4 flex items-start gap-3">
+                    <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-amber-800">ข้อเสนอพิเศษ</p>
+                      <p className="text-sm text-amber-900">{promotionSuggestion.message}</p>
+                      <p className="text-xs text-amber-900/70 mt-1">แตะเพื่อใช้</p>
+                      {promotionSuggestion.missing.length > 0 && (
+                        <div className="flex items-center gap-2 mt-2">
+                          {promotionSuggestion.missing.map(id => {
+                            const Icon = serviceDisplayConfig[id].Icon;
+                            return <Icon key={id} serviceid={id} className="w-5 h-5" />
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {!isValidBundle && cmoSuggestion && (
+                <Card 
+                  className="mt-2 border-amber-300 bg-amber-50 cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedServices(new Set(cmoSuggestion.suggestedSelection))}
+                >
+                  <div className="p-3 md:p-4 flex items-start gap-3">
+                    <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-amber-800">คำแนะนำอัจฉริยะ</p>
+                        {cmoSuggestion.badge && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 font-bold uppercase tracking-wide">{cmoSuggestion.badge}</span>
+                        )}
+                      </div>
+                      <p className="text-sm text-amber-900">{cmoSuggestion.message}</p>
+                      <p className="text-xs text-amber-900/70 mt-1">แตะเพื่อใช้</p>
+                      {cmoSuggestion.icons && cmoSuggestion.icons.length > 0 && (
+                        <div className="flex items-center gap-2 mt-2">
+                          {cmoSuggestion.icons.map(id => {
+                            const Icon = serviceDisplayConfig[id].Icon;
+                            return <Icon key={id} serviceid={id} className="w-5 h-5" />
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Total cost section matching reference UI exactly */}
+              <div className="flex justify-between items-end pt-4 border-t mt-2">
+                <span className="text-base font-semibold text-gray-800">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
+                <span className="font-bold text-2xl text-red-600">{selectedServices.size > 0 ? `${total.toFixed(0)} บาท` : '0 บาท'}</span>
+              </div>
             </div>
 
+            {/* Progress bar and button section matching reference UI */}
             <div className="px-4 pb-4 pt-2">
-                <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                        {[1, 2, 3, 4].map(step => (
-                            <div key={step} className={cn("h-1.5 rounded-full flex-1", selectedServices.size >= step ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-600')}></div>
-                        ))}
-                    </div>
-                     <Button 
-                        size="lg" 
-                        className={cn(
-                          "w-full rounded-full h-12 text-lg font-bold",
-                          selectedServices.size === 0 || !isValidBundle
-                            ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                            : "bg-primary hover:bg-primary/90 text-white"
-                        )}
-                        disabled={selectedServices.size === 0 || !isValidBundle}
-                        onClick={handleNext}
-                     >
-                        {selectedServices.size === 0 ? "Start building" : (isValidBundle ? "Continue" : "Choose a bundle to continue")}
-                    </Button>
+              <div className="space-y-3">
+                {/* Progress bar with dots matching reference UI exactly */}
+                <div className="flex items-center gap-2">
+                  {[1, 2, 3, 4].map(step => (
+                    <div key={step} className={cn("h-1.5 rounded-full flex-1", selectedServices.size >= step ? 'bg-red-500' : 'bg-gray-200')}></div>
+                  ))}
+                  {/* Grey segment and dot as shown in reference - only show when less than 4 services */}
+                  {selectedServices.size < 4 && (
+                    <>
+                      <div className="h-1.5 w-4 bg-gray-300 rounded-full"></div>
+                      <div className="h-1.5 w-1.5 bg-gray-300 rounded-full"></div>
+                    </>
+                  )}
                 </div>
+                
+                {/* Action button matching reference UI exactly */}
+                <Button 
+                  size="lg" 
+                  className={cn(
+                    "w-full rounded-full h-12 text-lg font-bold",
+                    selectedServices.size === 0 || (selectedServices.size < 4 && !isValidBundle)
+                      ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                      : "bg-red-600 hover:bg-red-700 text-white"
+                  )}
+                  disabled={selectedServices.size === 0 || (selectedServices.size < 4 && !isValidBundle)}
+                  onClick={handleNext}
+                >
+                  {selectedServices.size === 0 ? "เริ่มต้นสร้าง" : (selectedServices.size === 4 ? "ถัดไป" : (isValidBundle ? "ถัดไป" : "เลือกแพ็กเกจเพื่อดำเนินการต่อ"))}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -612,92 +708,83 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
     const selectedParentServicesCount = new Set(Array.from(selectedServices).map(id => getParentServiceName(id))).size;
     const isDisabled = !isSelected && !selectedPlanInGroup && selectedParentServicesCount >= MAX_SELECTION_LIMIT;
 
-    const getPriceInfo = useMemo(() => {
-        const calculateTotalPrice = (services: Set<ServiceId>): number => {
-            const bestOffer = findBestOffer(services);
-            if (bestOffer && bestOffer.services.length === services.size) {
-                return bestOffer.sellingPrice;
-            }
-            return Array.from(services).reduce((acc, id) => {
-                const s = subscriptionServices.find(s => s.id === id);
-                const promotionalOffer = offerGroups.find(o => o.packName === 'Pack0' && o.services[0] === id);
-                return acc + (promotionalOffer?.sellingPrice || s?.plans[0].price || 0);
-            }, 0);
-        };
+    // Get promotional price based on service type as shown in reference images
+    const getPromotionalPrice = () => {
+        if (service.id === 'youtube') return 100;
+        if (service.id === 'trueplus') return 119;
+        if (service.id === 'trueidshort') return 90;
+        if (service.id === 'viu') return 90;
+        if (service.id === 'iqiyi') return 89;
+        if (service.id === 'oned') return 59;
+        if (service.id === 'wetv') return 59;
+        if (service.id === 'netflix-mobile') return 100;
+        if (service.id === 'netflix-standard') return 100;
+        if (service.id === 'netflix-premium') return 100;
+        return 119; // Default promotional price
+    };
 
-        if (isSelected) {
-            return null;
-        }
-        
-        let incrementalCost: number;
-        const currentTotal = calculateTotalPrice(selectedServices);
+    // Get actual public price (what users would pay elsewhere)
+    const getPublicPrice = () => {
+        if (service.id === 'youtube') return 179;
+        if (service.id === 'viu') return 89;
+        if (service.id === 'netflix-mobile') return 199;
+        if (service.id === 'iqiyi') return 89;
+        if (service.id === 'wetv') return 59;
+        if (service.id === 'oned') return 59;
+        if (service.id === 'trueplus') return 119;
+        if (service.id === 'trueidshort') return 90;
+        if (service.id === 'netflix-basic') return 199;
+        if (service.id === 'netflix-standard') return 299;
+        if (service.id === 'netflix-premium') return 419;
+        return 119; // Default public price
+    };
 
-        if (selectedPlanInGroup) {
-            // This is a plan replacement scenario
-            const tempSelectionWithoutOldPlan = new Set(selectedServices);
-            tempSelectionWithoutOldPlan.delete(selectedPlanInGroup);
-            const totalWithoutOldPlan = calculateTotalPrice(tempSelectionWithoutOldPlan);
-
-            const tempSelectionWithNewPlan = new Set(tempSelectionWithoutOldPlan);
-            tempSelectionWithNewPlan.add(service.id as ServiceId);
-            const newTotal = calculateTotalPrice(tempSelectionWithNewPlan);
-
-            incrementalCost = newTotal - totalWithoutOldPlan;
-        } else {
-            // Standard addition scenario
-            const potentialSelection = new Set(selectedServices);
-            potentialSelection.add(service.id as ServiceId);
-            const newTotal = calculateTotalPrice(potentialSelection);
-            incrementalCost = newTotal - currentTotal;
-        }
-        
-        const displayCost = Math.abs(incrementalCost);
-
-        if (incrementalCost < 0) {
-            return (
-                <div className="text-right">
-                    <p className="font-bold text-lg text-green-600">
-                      ({incrementalCost.toFixed(0)}) THB
-                    </p>
-                    <p className="text-xs text-muted-foreground line-through">{service.plans[0].price.toFixed(0)} THB</p>
-                </div>
-            )
-        }
-        
-        return (
-            <div className="text-right">
-                <p className={cn("font-bold text-lg", incrementalCost > 0 ? "text-primary" : "text-gray-500")}>
-                  +{displayCost.toFixed(0)} THB
-                </p>
-                <p className="text-xs text-muted-foreground line-through">{service.plans[0].price.toFixed(0)} THB</p>
-            </div>
-        );
-    }, [service.id, service.plans, selectedServices, isSelected, selectedPlanInGroup]);
-  
+    const promotionalPrice = getPromotionalPrice();
+    const publicPrice = getPublicPrice();
+   
   return (
-    <div
+    <Card
       onClick={!isDisabled ? onToggle : undefined}
       className={cn(
-        'p-3 rounded-xl border-2 bg-white dark:bg-gray-800 transition-all flex items-center gap-4 relative',
-        isSelected ? 'border-primary shadow-lg' : 'border-gray-200 dark:border-gray-700',
-        isDisabled ? 'bg-gray-100 dark:bg-gray-700/50 border-gray-200 dark:border-gray-700 cursor-not-allowed opacity-60' : 'cursor-pointer'
+        'p-4 rounded-xl border bg-white transition-all flex items-center gap-4 relative',
+        isSelected ? 'border-red-500 shadow-lg' : 'border-gray-200',
+        isDisabled ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-60' : 'cursor-pointer hover:shadow-md'
       )}
     >
-        <div className={cn("w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0", isSelected ? "bg-primary border-primary" : "border-gray-300 dark:border-gray-600")}></div>
-
+        {/* Service Icon */}
         <Icon 
           serviceid={service.id}
-          className={cn("w-10 h-10 object-contain shrink-0", service.id.startsWith('netflix') && 'w-7 h-10')} 
+          className={cn("w-12 h-12 object-contain shrink-0", service.id.startsWith('netflix') && 'w-8 h-12')} 
         />
+        
+        {/* Service Details */}
         <div className="flex-grow min-w-0">
-          <p className={cn("font-bold text-base text-gray-800 dark:text-gray-200")}>{title}</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{service.plans[0].features.join(' • ')}</p>
+          <p className="font-bold text-base text-gray-900 mb-1">{title}</p>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-lg text-red-600">+{promotionalPrice} THB</span>
+            <span className="text-sm text-gray-500 line-through">{publicPrice.toLocaleString()} THB</span>
+          </div>
         </div>
-        <div className="ml-auto text-right">
-            {getPriceInfo}
-        </div>
-        {isPlanSwitch && <p className="text-xs text-destructive font-semibold absolute bottom-1 right-3">Only one {parentName} plan allowed.</p>}
-    </div>
+        
+        {/* Add Button */}
+        <Button
+          size="sm"
+          className={cn(
+            "rounded-full px-6 py-2 font-semibold transition-all",
+            isSelected 
+              ? "bg-red-600 text-white" 
+              : "bg-red-600 hover:bg-red-700 text-white"
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+        >
+          {isSelected ? "✓ Added" : "Add"}
+        </Button>
+         
+         {/* Remove the constraint message since services are independent */}
+     </Card>
   )
 }
 
