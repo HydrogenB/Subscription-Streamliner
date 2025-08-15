@@ -1,6 +1,7 @@
 
 'use client';
 
+import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,7 +28,7 @@ const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: 
   'netflix-premium': { Icon: NetflixIcon, title: 'Netflix Premium', logoUrl: 'https://icon-library.com/images/netflix-icon-transparent/netflix-icon-transparent-29.jpg', publicPrice: 419 },
 };
 
-export default function ReceiptPage() {
+function ReceiptContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const bundleParam = searchParams.get('bundle');
@@ -98,113 +99,130 @@ export default function ReceiptPage() {
       </div>
 
       <main className="flex-1 px-4 pb-32">
-        {/* Main content card */}
-        <Card className="p-6 bg-white rounded-xl shadow-sm">
-          {/* Subscription Header */}
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-bold text-red-600 mb-2">True5G Postpaid</h2>
-            <p className="text-lg font-semibold text-gray-900">{phoneNumber}</p>
-          </div>
-
-          {/* Auto-renew package details */}
-          <div className="space-y-4 mb-6">
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-blue-100 rounded-lg flex items-center justify-center mt-1">
-                <Package className="w-4 h-4 text-blue-600" />
+        {/* Receipt Card */}
+        <Card className="mb-6">
+          <div className="p-6">
+            {/* Order Header */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <Receipt className="w-8 h-8 text-green-600" />
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Order Confirmed</h2>
+                  <p className="text-sm text-gray-600">Order #{orderId}</p>
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="font-semibold text-gray-900 mb-2">auto-renew package</p>
-                <ul className="space-y-2">
-                  {services.map(serviceId => {
-                    const title = serviceDisplayConfig[serviceId]?.title;
-                    const publicPrice = serviceDisplayConfig[serviceId]?.publicPrice;
-                    
-                    if (!title) return null;
-
-                    return (
-                      <li key={serviceId} className="flex items-center gap-2">
-                        {renderServiceIcon(serviceId)}
-                        <span className="text-sm text-gray-700">{title}</span>
-                        <span className="text-sm text-gray-500 ml-auto">฿{publicPrice}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Order Date</p>
+                <p className="font-semibold text-gray-900">{orderDateString}</p>
+                <p className="text-sm text-gray-500">{orderTime}</p>
               </div>
             </div>
 
-            {/* Order date */}
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-green-100 rounded-lg flex items-center justify-center mt-1">
-                <Calendar className="w-4 h-4 text-green-600" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-gray-900">Order date</p>
-                <p className="text-sm text-gray-700">{orderDateString} {orderTime} GMT+7:00</p>
-              </div>
+            {/* Services List */}
+            <div className="space-y-4 mb-6">
+              <h3 className="font-semibold text-gray-900">Services Ordered</h3>
+              {services.map((serviceId) => {
+                const serviceConfig = serviceDisplayConfig[serviceId];
+                if (!serviceConfig) return null;
+
+                return (
+                  <div key={serviceId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      {renderServiceIcon(serviceId)}
+                      <span className="font-medium text-gray-900">{serviceConfig.title}</span>
+                    </div>
+                    <span className="text-gray-600">{serviceConfig.publicPrice} THB</span>
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Total cost */}
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-yellow-100 rounded-lg flex items-center justify-center mt-1">
-                <span className="text-yellow-600 font-bold text-lg">฿</span>
+            {/* Price Summary */}
+            <div className="border-t pt-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Public Price Total:</span>
+                <span className="text-gray-900">{totalPublicPrice} THB</span>
               </div>
-              <div className="flex-1">
-                <p className="font-semibold text-gray-900">Total cost</p>
-                <p className="text-sm text-gray-700">{bundlePrice.toFixed(2)} THB (Excl. VAT)</p>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Bundle Price:</span>
+                <span className="text-green-600 font-semibold">{bundlePrice} THB</span>
               </div>
-            </div>
-
-            {/* Public price comparison */}
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-orange-100 rounded-lg flex items-center justify-center mt-1">
-                <span className="text-orange-600 font-bold text-lg">฿</span>
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-gray-900">Public price (elsewhere)</p>
-                <p className="text-sm text-gray-700 line-through">{totalPublicPrice.toFixed(2)} THB</p>
-                <p className="text-sm text-green-600 font-semibold">You save ฿{savings.toFixed(2)}!</p>
-              </div>
-            </div>
-
-            {/* Payment method */}
-            <div className="flex items-start gap-3">
-              <div className="w-6 h-6 bg-purple-100 rounded-lg flex items-center justify-center mt-1">
-                <Receipt className="w-4 h-4 text-purple-600" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-gray-900">Payment method</p>
-                <p className="text-sm text-gray-700">True Bill</p>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">You Saved:</span>
+                <span className="text-green-600 font-semibold">{savings} THB</span>
               </div>
             </div>
           </div>
         </Card>
 
-        {/* Instructional message */}
-        <div className="text-center mt-6 px-4">
-          <p className="text-sm text-gray-600">
-            The purchased package will be active after your received SMS.
-          </p>
+        {/* Contact Information */}
+        <Card className="mb-6">
+          <div className="p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Contact Information</h3>
+            <div className="space-y-3">
+              <div className="flex items-center space-x-3">
+                <Phone className="w-5 h-5 text-gray-500" />
+                <span className="text-gray-700">{phoneNumber}</span>
+              </div>
+              <div className="flex items-center space-x-3">
+                <Calendar className="w-5 h-5 text-gray-500" />
+                <span className="text-gray-700">Next billing: {new Date(orderDate.getTime() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Next Steps */}
+        <Card>
+          <div className="p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Next Steps</h3>
+            <div className="space-y-3 text-sm text-gray-700">
+              <div className="flex items-start space-x-3">
+                <Package className="w-5 h-5 text-blue-600 mt-0.5" />
+                <span>Your services will be activated within 24 hours</span>
+              </div>
+              <div className="flex items-start space-x-3">
+                <CreditCard className="w-5 h-5 text-green-600 mt-0.5" />
+                <span>Payment will be processed on your next billing cycle</span>
+              </div>
+              <div className="flex items-start space-x-3">
+                <Calendar className="w-5 h-5 text-purple-600 mt-0.5" />
+                <span>You can manage your subscriptions anytime</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Action Button */}
+        <div className="mt-6">
+          <Button 
+            onClick={handleGoToSubscriptions}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-lg font-semibold"
+          >
+            View My Subscriptions
+          </Button>
         </div>
       </main>
+    </div>
+  );
+}
 
-      {/* Bottom action button */}
-      <div className="fixed bottom-0 left-0 right-0 z-10 bg-white border-t border-gray-200 px-4 py-4">
-        <div className="max-w-md mx-auto">
-          <Button 
-            size="lg" 
-            className="w-full bg-red-600 hover:bg-red-700 text-white py-4 text-lg font-semibold rounded-xl"
-            onClick={handleGoToSubscriptions}
-          >
-            Go to my subscriptions
-          </Button>
-          
-          {/* Navigation indicator */}
-          <div className="mt-2 flex justify-center">
-            <div className="w-32 h-1 bg-black rounded-full"></div>
+export default function ReceiptPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col min-h-screen bg-gray-50">
+        <div className="bg-white px-4 py-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900">Thank you</h1>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading receipt...</p>
           </div>
         </div>
       </div>
-    </div>
+    }>
+      <ReceiptContent />
+    </Suspense>
   );
 }

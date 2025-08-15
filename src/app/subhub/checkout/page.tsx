@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -30,7 +30,7 @@ const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: 
   'netflix-premium': { Icon: NetflixIcon, title: 'Netflix Premium', details: '480p, 1 screen, 1 device' },
 };
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const bundleParam = searchParams.get('bundle');
@@ -256,6 +256,26 @@ export default function CheckoutPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col min-h-screen bg-gray-50">
+        <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center">
+          <h1 className="text-lg font-semibold text-gray-900 ml-2">Subscription plan</h1>
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600 mx-auto mb-4"></div>
+            <p className="text-gray-500">Loading...</p>
+          </div>
+        </div>
+      </div>
+    }>
+      <CheckoutContent />
+    </Suspense>
   );
 }
 

@@ -489,35 +489,35 @@ export default function AddBundlePage() {
         </div>
       </main>
 
-      {/* Footer with summary - matching reference UI exactly */}
+      {/* Footer with summary - condensed version */}
       <footer className="fixed bottom-0 left-0 right-0 z-10 w-full max-w-md mx-auto">
         <div className="bg-white rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)]">
-          {/* Top handle and header */}
-          <div className="px-4 py-3 flex justify-between items-center w-full cursor-pointer" onClick={() => setIsSummaryOpen(prev => !prev)}>
+          {/* Top handle and header - condensed */}
+          <div className="px-3 py-2 flex justify-between items-center w-full cursor-pointer" onClick={() => setIsSummaryOpen(prev => !prev)}>
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-base text-gray-800">
+              <h3 className="font-semibold text-sm text-gray-800">
                 สรุปค่าบริการรายเดือน
               </h3>
-              <ChevronUp className={cn("w-5 h-5 text-gray-500 transition-transform", !isSummaryOpen && "rotate-180")} />
+              <ChevronUp className={cn("w-4 h-4 text-gray-500 transition-transform", !isSummaryOpen && "rotate-180")} />
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {savings > 0 && (
-                <span className="text-sm font-semibold text-green-600">ส่วนลดสูงสุด {savings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป</span>
+                <span className="text-xs font-semibold text-green-600">ส่วนลดสูงสุด {savings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป</span>
               )}
-              <span className="font-bold text-lg text-red-600">{selectedServices.size > 0 ? `${total.toFixed(0)} บาท` : `0 บาท`}</span>
+              <span className="font-bold text-base text-red-600">{selectedServices.size > 0 ? `${total.toFixed(0)} บาท` : `0 บาท`}</span>
             </div>
           </div>
           
-          {/* Collapsible content */}
+          {/* Collapsible content - condensed */}
           <div className={cn("overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
-            <div className="px-4 pb-4 space-y-4">
+            <div className="px-3 pb-3 space-y-3">
               
               {selectedServices.size > 0 ? (
-                <div className="space-y-4 pt-2">
-                   {/* Promotional banner matching reference UI exactly */}
+                <div className="space-y-3 pt-1">
+                   {/* Promotional banner - condensed */}
                    {savings > 0 && (
-                     <div className="bg-gradient-to-r from-purple-600 to-pink-500 text-white p-4 rounded-lg">
-                       <p className="text-center font-bold text-lg">
+                     <div className="bg-gradient-to-r from-purple-600 to-pink-500 text-white p-3 rounded-lg">
+                       <p className="text-center font-bold text-base">
                          {selectedServices.size === 4 
                            ? `ยินดีด้วย! คุณได้รับส่วนลดสูงสุด ${savings.toFixed(0)} บาท!`
                            : `ส่วนลดสูงสุด ${savings.toFixed(0)} บาท เมื่อเลือกสูงสุด 4 แอป`
@@ -526,10 +526,10 @@ export default function AddBundlePage() {
                      </div>
                    )}
                   
-                  {/* Services list matching reference UI */}
+                  {/* Services list - condensed */}
                   <div>
-                    <h4 className="font-bold text-gray-800 mb-2 text-base">บริการของคุณ</h4>
-                    <ul className="space-y-2 text-sm text-gray-700">
+                    <h4 className="font-bold text-gray-800 mb-1 text-sm">บริการของคุณ</h4>
+                    <ul className="space-y-1 text-xs text-gray-700">
                       {Array.from(selectedServices).map(id => {
                         const service = subscriptionServices.find(s => s.id === id);
                         if (!service) return null;
@@ -537,7 +537,7 @@ export default function AddBundlePage() {
                         return (
                           <li key={id} className="flex justify-between items-center">
                             <div className="flex items-center gap-2">
-                              <div className="w-5 flex justify-center">•</div>
+                              <div className="w-4 flex justify-center">•</div>
                               <span>{serviceDisplayConfig[id as ServiceId].title}</span>
                             </div>
                             <span className={cn(savings > 0 && "text-muted-foreground line-through")}>{individualPrice.toFixed(0)} THB</span>
@@ -547,14 +547,14 @@ export default function AddBundlePage() {
                     </ul>
                   </div>
                   
-                  {/* Bundle discount section */}
+                  {/* Bundle discount section - condensed */}
                   {savings > 0 && (
                     <div>
-                      <h4 className="font-bold text-gray-800 mb-2 text-base">ส่วนลดแพ็กเกจ</h4>
-                      <ul className="space-y-1.5 text-sm">
+                      <h4 className="font-bold text-gray-800 mb-1 text-sm">ส่วนลดแพ็กเกจ</h4>
+                      <ul className="space-y-1 text-xs">
                         <li className="flex justify-between items-center">
                           <div className="flex items-center gap-2">
-                            <div className="w-5 flex justify-center">•</div>
+                            <div className="w-4 flex justify-center">•</div>
                             <span className="text-gray-700">ส่วนลดอัตโนมัติ</span>
                           </div>
                           <span className="font-medium text-green-600">-{savings.toFixed(0)} บาท</span>
@@ -563,47 +563,47 @@ export default function AddBundlePage() {
                     </div>
                   )}
                   
-                  {/* Additional text from reference UI exactly */}
-                  <div className="text-center py-2">
-                    <p className="text-sm text-gray-600">
+                  {/* Additional text - condensed */}
+                  <div className="text-center py-1">
+                    <p className="text-xs text-gray-600">
                       + เพิ่มบริการเพื่อรับส่วนลด (ไม่บังคับเลือก)
                     </p>
                   </div>
                 </div>
               ) : (
-                <div className="text-center py-4 text-muted-foreground">
+                <div className="text-center py-2 text-muted-foreground text-sm">
                   เลือกบริการอย่างน้อย 1 รายการเพื่อเริ่มต้น
                 </div>
               )}
               
-              {/* Suggestions and alerts */}
+              {/* Suggestions and alerts - condensed */}
               {!isValidBundle && selectedServices.size > 0 && !promotionSuggestion && !cmoSuggestion && (
-                <Card className="mt-4 bg-red-50 border-red-200">
-                  <div className="p-3 flex items-center gap-3">
-                    <AlertCircle className="w-5 h-5 text-destructive" />
-                    <p className="text-sm text-destructive">ไม่พบแพ็กเกจสำหรับการเลือกนี้ ลองเลือกแบบอื่นเพื่อประหยัดมากขึ้น</p>
+                <Card className="mt-3 bg-red-50 border-red-200">
+                  <div className="p-2 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-destructive" />
+                    <p className="text-xs text-destructive">ไม่พบแพ็กเกจสำหรับการเลือกนี้ ลองเลือกแบบอื่นเพื่อประหยัดมากขึ้น</p>
                   </div>
                 </Card>
               )}
 
               {!isValidBundle && !cmoSuggestion && promotionSuggestion && (
                 <Card 
-                  className="mt-4 border-amber-300 bg-amber-50 cursor-pointer"
+                  className="mt-3 border-amber-300 bg-amber-50 cursor-pointer"
                   role="button"
                   tabIndex={0}
                   onClick={() => setSelectedServices(new Set(promotionSuggestion.offer.services as ServiceId[]))}
                 >
-                  <div className="p-3 md:p-4 flex items-start gap-3">
-                    <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
+                  <div className="p-2 flex items-start gap-2">
+                    <div className="shrink-0 w-4 h-4 rounded-full bg-amber-400" />
                     <div className="flex-1">
-                      <p className="font-semibold text-amber-800">ข้อเสนอพิเศษ</p>
-                      <p className="text-sm text-amber-900">{promotionSuggestion.message}</p>
+                      <p className="font-semibold text-amber-800 text-sm">ข้อเสนอพิเศษ</p>
+                      <p className="text-xs text-amber-900">{promotionSuggestion.message}</p>
                       <p className="text-xs text-amber-900/70 mt-1">แตะเพื่อใช้</p>
                       {promotionSuggestion.missing.length > 0 && (
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center gap-2 mt-1">
                           {promotionSuggestion.missing.map(id => {
                             const Icon = serviceDisplayConfig[id].Icon;
-                            return <Icon key={id} serviceid={id} className="w-5 h-5" />
+                            return <Icon key={id} serviceid={id} className="w-4 h-4" />
                           })}
                         </div>
                       )}
@@ -619,22 +619,22 @@ export default function AddBundlePage() {
                   tabIndex={0}
                   onClick={() => setSelectedServices(new Set(cmoSuggestion.suggestedSelection))}
                 >
-                  <div className="p-3 md:p-4 flex items-start gap-3">
-                    <div className="shrink-0 w-5 h-5 rounded-full bg-amber-400" />
+                  <div className="p-2 flex items-start gap-2">
+                    <div className="shrink-0 w-4 h-4 rounded-full bg-amber-400" />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="font-semibold text-amber-800">คำแนะนำอัจฉริยะ</p>
+                        <p className="font-semibold text-amber-800 text-sm">คำแนะนำอัจฉริยะ</p>
                         {cmoSuggestion.badge && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 font-bold uppercase tracking-wide">{cmoSuggestion.badge}</span>
+                          <span className="text-[10px] px-1 py-0.5 rounded bg-amber-200 text-amber-900 font-bold uppercase tracking-wide">{cmoSuggestion.badge}</span>
                         )}
                       </div>
-                      <p className="text-sm text-amber-900">{cmoSuggestion.message}</p>
+                      <p className="text-xs text-amber-900">{cmoSuggestion.message}</p>
                       <p className="text-xs text-amber-900/70 mt-1">แตะเพื่อใช้</p>
                       {cmoSuggestion.icons && cmoSuggestion.icons.length > 0 && (
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className="flex items-center gap-2 mt-1">
                           {cmoSuggestion.icons.map(id => {
                             const Icon = serviceDisplayConfig[id].Icon;
-                            return <Icon key={id} serviceid={id} className="w-5 h-5" />
+                            return <Icon key={id} serviceid={id} className="w-4 h-4" />
                           })}
                         </div>
                       )}
@@ -643,35 +643,35 @@ export default function AddBundlePage() {
                 </Card>
               )}
 
-              {/* Total cost section matching reference UI exactly */}
-              <div className="flex justify-between items-end pt-4 border-t mt-2">
-                <span className="text-base font-semibold text-gray-800">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
-                <span className="font-bold text-2xl text-red-600">{selectedServices.size > 0 ? `${total.toFixed(0)} บาท` : '0 บาท'}</span>
+              {/* Total cost section - condensed */}
+              <div className="flex justify-between items-end pt-3 border-t mt-1">
+                <span className="text-sm font-semibold text-gray-800">ค่าบริการ (ไม่รวมภาษีมูลค่าเพิ่ม)</span>
+                <span className="font-bold text-xl text-red-600">{selectedServices.size > 0 ? `${total.toFixed(0)} บาท` : '0 บาท'}</span>
               </div>
             </div>
 
-            {/* Progress bar and button section matching reference UI */}
-            <div className="px-4 pb-4 pt-2">
-              <div className="space-y-3">
-                {/* Progress bar with dots matching reference UI exactly */}
-                <div className="flex items-center gap-2">
+            {/* Progress bar and button section - condensed */}
+            <div className="px-3 pb-3 pt-1">
+              <div className="space-y-2">
+                {/* Progress bar with dots - condensed */}
+                <div className="flex items-center gap-1.5">
                   {[1, 2, 3, 4].map(step => (
-                    <div key={step} className={cn("h-1.5 rounded-full flex-1", selectedServices.size >= step ? 'bg-red-500' : 'bg-gray-200')}></div>
+                    <div key={step} className={cn("h-1 rounded-full flex-1", selectedServices.size >= step ? 'bg-red-500' : 'bg-gray-200')}></div>
                   ))}
-                  {/* Grey segment and dot as shown in reference - only show when less than 4 services */}
+                  {/* Grey segment and dot - only show when less than 4 services */}
                   {selectedServices.size < 4 && (
                     <>
-                      <div className="h-1.5 w-4 bg-gray-300 rounded-full"></div>
-                      <div className="h-1.5 w-1.5 bg-gray-300 rounded-full"></div>
+                      <div className="h-1 w-3 bg-gray-300 rounded-full"></div>
+                      <div className="h-1 w-1 bg-gray-300 rounded-full"></div>
                     </>
                   )}
                 </div>
                 
-                {/* Action button matching reference UI exactly */}
+                {/* Action button - condensed */}
                 <Button 
                   size="lg" 
                   className={cn(
-                    "w-full rounded-full h-12 text-lg font-bold",
+                    "w-full rounded-full h-10 text-base font-bold",
                     selectedServices.size === 0 || (selectedServices.size < 4 && !isValidBundle)
                       ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                       : "bg-red-600 hover:bg-red-700 text-white"
