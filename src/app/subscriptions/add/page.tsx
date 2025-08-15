@@ -1,75 +1,44 @@
-
-
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Header } from '@/components/layout/header';
 import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { SubscriptionService, OfferGroup, ServiceId } from '@/lib/types';
+import { ServiceCard } from '@/components/subscriptions/ServiceCard';
+import { BillingSummary } from '@/components/subscriptions/BillingSummary';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Tv, AlertCircle, ChevronUp, Gift, Home, FileText } from 'lucide-react';
+import { ChevronLeft, Menu, AlertCircle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { NetflixIcon } from '@/components/icons/netflix-icon';
-import { YouTubeIcon } from '@/components/icons/youtube-icon';
-import { ViuIcon } from '@/components/icons/viu-icon';
-import { IQIYIIcon } from '@/components/icons/iqiyi-icon';
-import { WeTVIcon } from '@/components/icons/wetv-icon';
-import { OneDIcon } from '@/components/icons/oned-icon';
-import { TrueIDIcon } from '@/components/icons/trueid-icon';
-import { Card } from '@/components/ui/card';
+import { serviceDisplayConfig } from '@/lib/config';
 
-const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: string }> = {
-  youtube: { Icon: YouTubeIcon, title: 'Youtube Premium' },
-  viu: { Icon: ViuIcon, title: 'VIU' },
-  'netflix-mobile': { Icon: NetflixIcon, title: 'Netflix Mobile' },
-  iqiyi: { Icon: IQIYIIcon, title: 'iQIYI VIP Standard' },
-  wetv: { Icon: WeTVIcon, title: 'WeTV' },
-  oned: { Icon: OneDIcon, title: 'oneD' },
-  trueplus: { Icon: TrueIDIcon, title: 'True Plus' },
-  trueidshort: { Icon: TrueIDIcon, title: 'True ID Short' },
-  'netflix-basic': { Icon: NetflixIcon, title: 'Netflix Basic' },
-  'netflix-standard': { Icon: NetflixIcon, title: 'Netflix Standard' },
-  'netflix-premium': { Icon: NetflixIcon, title: 'Netflix Premium' },
-};
+// Constants
+const NETFLIX_PLANS: ServiceId[] = ['netflix-mobile', 'netflix-basic', 'netflix-standard', 'netflix-premium'];
+const MAX_SELECTION_LIMIT = 4;
 
+// Helper Functions
 function findBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
-  if (selectedIds.size === 0) {
-    return null;
-  }
-
+  if (selectedIds.size === 0) return null;
   const selectedArray = Array.from(selectedIds).sort();
-  
   const matchedOffers = offerGroups.filter(offer => {
-    if (offer.services.length !== selectedArray.length) {
-      return false;
-    }
+    if (offer.services.length !== selectedArray.length) return false;
     const offerServicesSorted = [...offer.services].sort();
     return JSON.stringify(offerServicesSorted) === JSON.stringify(selectedArray);
   });
-  
   if (matchedOffers.length > 0) {
     return matchedOffers.reduce((best, current) =>
         current.sellingPrice < best.sellingPrice ? current : best
     );
   }
-  
   return null;
 }
 
-
 function findNextBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
-    if (selectedIds.size === 0 || selectedIds.size >= MAX_SELECTION_LIMIT) {
-        return null;
-    }
-
+    if (selectedIds.size === 0 || selectedIds.size >= MAX_SELECTION_LIMIT) return null;
     const potentialOffers = offerGroups.filter(offer => {
         if (offer.services.length <= selectedIds.size) return false;
         const selectedIdArray = Array.from(selectedIds);
         return selectedIdArray.every(id => offer.services.includes(id));
     });
-
     if (potentialOffers.length > 0) {
         return potentialOffers.reduce((best, current) => {
             const bestSavings = best.fullPrice - best.sellingPrice;
@@ -77,384 +46,266 @@ function findNextBestOffer(selectedIds: Set<ServiceId>): OfferGroup | null {
             return currentSavings > bestSavings ? current : best;
         });
     }
-
     return null;
 }
 
-const NETFLIX_PLANS: ServiceId[] = ['netflix-mobile', 'netflix-basic', 'netflix-standard', 'netflix-premium'];
-const MAX_SELECTION_LIMIT = 4;
-
-const allServices = subscriptionServices;
-
+// Main Page Component
 export default function AddBundlePage() {
-  const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set([]));
-  const [isSummaryOpen, setIsSummaryOpen] = useState(true);
+  // All hooks must be called unconditionally at the top level
+  const [allServices, setAllServices] = useState<SubscriptionService[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set(['viu']));
+  const [selectedBundleId, setSelectedBundleId] = useState<string | null>(null);
+  const [notification, setNotification] = useState('');
+  const [isBillingExpanded, setIsBillingExpanded] = useState(false);
+  const [isIssueExpanded, setIsIssueExpanded] = useState(false);
   const router = useRouter();
-
-  const handleServiceToggle = (serviceId: ServiceId) => {
-    setSelectedServices(prev => {
-      const newSelection = new Set(prev);
-      
-      if (newSelection.has(serviceId)) {
-        newSelection.delete(serviceId);
-      } else {
-        if (newSelection.size >= MAX_SELECTION_LIMIT) {
-          alert(`You can select a maximum of ${MAX_SELECTION_LIMIT} services.`);
-          return prev;
-        }
-
-        newSelection.add(serviceId);
-        if (NETFLIX_PLANS.includes(serviceId)) {
-          for (const plan of NETFLIX_PLANS) {
-            if (plan !== serviceId) {
-              newSelection.delete(plan);
-            }
-          }
-        }
-      }
-      return newSelection;
-    });
-  };
-
-  const { total, savings, packName, isValidBundle, fullPrice } = useMemo(() => {
+  
+  // Memoized values
+  const { total, savings, isValidBundle, fullPrice } = useMemo(() => {
     const matchedOffer = findBestOffer(selectedServices);
-
     if (matchedOffer) {
       return { 
         total: matchedOffer.sellingPrice, 
         savings: matchedOffer.fullPrice - matchedOffer.sellingPrice, 
-        packName: matchedOffer.id, 
         isValidBundle: true,
         fullPrice: matchedOffer.fullPrice
       };
     }
-    
-    if (selectedServices.size > 0) {
-        const currentFullPrice = Array.from(selectedServices).reduce((acc, id) => {
-            const service = subscriptionServices.find(s => s.id === id);
-            return acc + (service?.plans[0].price || 0);
-        }, 0);
-        return { total: currentFullPrice, savings: 0, packName: "Custom Bundle", isValidBundle: false, fullPrice: currentFullPrice };
-    }
-
-    return { total: 0, savings: 0, packName: "Choose your bundle", isValidBundle: false, fullPrice: 0 };
-  }, [selectedServices]);
+    const currentFullPrice = Array.from(selectedServices).reduce((acc, id) => {
+      const service = allServices.find(s => s.id === id);
+      return acc + (service?.plans[0].price || 0);
+    }, 0);
+    return { total: currentFullPrice, savings: 0, isValidBundle: false, fullPrice: currentFullPrice };
+  }, [selectedServices, allServices]);
 
   const nextBestOffer = useMemo(() => {
     if (isValidBundle) return null;
     return findNextBestOffer(selectedServices);
   }, [selectedServices, isValidBundle]);
-
-
-  const getPriceInfo = (serviceId: ServiceId): { text: string; originalPrice?: string; type: 'bundle' | 'promo' | 'default' | 'none' } => {
-    const service = subscriptionServices.find(s => s.id === serviceId);
-    if (!service) return { text: '', type: 'none' };
-
-    if (selectedServices.has(serviceId)) {
-      return { text: '', type: 'none' };
-    }
   
-    if (selectedServices.size >= MAX_SELECTION_LIMIT) {
-      return { text: '', type: 'none' };
+  // Get selected services with their details
+  const selectedServicesList = useMemo(() => {
+    return Array.from(selectedServices).map(id => {
+      const service = allServices.find(s => s.id === id);
+      const config = serviceDisplayConfig[id as keyof typeof serviceDisplayConfig];
+      return {
+        id,
+        name: service?.name || id,
+        price: service?.plans[0]?.price || 0,
+        description: service?.description || '',
+        logo: config?.Icon
+      };
+    });
+  }, [selectedServices, allServices]);
+
+  // Fetch data on mount
+  useEffect(() => {
+    // In a real app, this would be an API call
+    setAllServices(subscriptionServices);
+    setIsLoading(false);
+  }, []);
+
+  const handleSelectBundle = (bundle: { id: string; services: ServiceId[] } | null) => {
+    if (bundle) {
+      setSelectedBundleId(bundle.id);
+      setSelectedServices(new Set(bundle.services));
+    } else {
+      setSelectedBundleId(null);
+      // Keep current selection when deselecting bundle
     }
+  };
+
+  const handleServiceToggle = (serviceId: ServiceId) => {
+    // Deselect any active bundle when manually changing services
+    if (selectedBundleId) {
+      setSelectedBundleId(null);
+    }
+
+    setSelectedServices(prev => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(serviceId)) {
+        newSelection.delete(serviceId);
+      } else {
+        newSelection.add(serviceId);
+      }
+      return newSelection;
+    });
+  };
+
+  // Helper function to get price info - moved outside of hooks to prevent recreation
+  const getPriceInfo = useCallback((serviceId: ServiceId): { text: string; originalPrice?: string; type: 'bundle' | 'promo' | 'default' | 'none' } => {
+    const service = allServices.find(s => s.id === serviceId);
+    if (!service) return { text: '', type: 'none' };
+    if (selectedServices.has(serviceId)) return { text: '', type: 'none' };
+    if (selectedServices.size >= MAX_SELECTION_LIMIT) return { text: '', type: 'none' };
 
     const selectedNetflixPlan = Array.from(selectedServices).find(id => NETFLIX_PLANS.includes(id));
     if (NETFLIX_PLANS.includes(serviceId) && selectedNetflixPlan) {
-        const currentNetflixService = subscriptionServices.find(s => s.id === selectedNetflixPlan);
+        const currentNetflixService = allServices.find(s => s.id === selectedNetflixPlan);
         if (!currentNetflixService) return {text: '', type: 'none'};
-        
         const increment = service.plans[0].price - currentNetflixService.plans[0].price;
-
-        return {
-            text: `+${increment.toFixed(0)} THB`,
-            originalPrice: `${service.plans[0].price.toFixed(0)} THB`,
-            type: 'default',
-        };
+        return { text: `+${increment.toFixed(0)} THB`, originalPrice: `${service.plans[0].price.toFixed(0)} THB`, type: 'default' };
     }
     
     if (selectedServices.size > 0) {
       const potentialSelection = new Set(selectedServices);
       potentialSelection.add(serviceId);
       const nextOffer = findBestOffer(potentialSelection);
-      const currentTotal = total;
-      
       if (nextOffer) {
-          const increment = nextOffer.sellingPrice - currentTotal;
+          const increment = nextOffer.sellingPrice - total;
           return { text: `+${increment.toFixed(0)} THB`, type: 'bundle' };
       } else {
-          const standalonePrice = service.plans[0].price;
-          return { text: `+${standalonePrice.toFixed(0)} THB`, type: 'default' };
+          return { text: `+${service.plans[0].price.toFixed(0)} THB`, type: 'default' };
       }
     }
   
-    const standalonePrice = service.plans[0].price;
     const singleOffer = offerGroups.find(o => o.services.length === 1 && o.services[0] === serviceId);
-    
-    if (singleOffer && singleOffer.sellingPrice < standalonePrice) {
-      return {
-        text: `${singleOffer.sellingPrice.toFixed(0)} THB`,
-        originalPrice: `${standalonePrice.toFixed(0)} THB`,
-        type: 'promo',
-      };
+    if (singleOffer && singleOffer.sellingPrice < service.plans[0].price) {
+      return { text: `${singleOffer.sellingPrice.toFixed(0)} THB`, originalPrice: `${service.plans[0].price.toFixed(0)} THB`, type: 'promo' };
     }
     
-    return {
-      text: `${standalonePrice.toFixed(0)} THB`,
-      type: 'default',
-    };
-  };
+    return { text: `${service.plans[0].price.toFixed(0)} THB`, type: 'default' };
+  }, [allServices, selectedServices, total]);
 
-  const isNetflixConflict = (serviceId: ServiceId): boolean => {
-    if (!NETFLIX_PLANS.includes(serviceId)) {
-      return false;
-    }
-    const selectedNetflixPlan = NETFLIX_PLANS.find(plan => selectedServices.has(plan));
-    return !!selectedNetflixPlan && selectedNetflixPlan !== serviceId;
-  }
-  
+  // getPriceInfo is already defined above with useCallback, removing duplicate
+
   const handleNext = () => {
     if (selectedServices.size === 0) return;
     const serviceIds = Array.from(selectedServices).join(',');
     router.push(`/subscriptions/confirm?services=${serviceIds}`);
   };
 
+  const isServiceListEmpty = allServices.length === 0;
+
+  const handleNextClick = () => {
+    // TODO: Navigate to the next step, e.g., payment
+    router.push('/subscriptions/confirm');
+  };
+
+  if (isLoading) {
+    return <div>Loading...</div>; // Or a proper skeleton screen
+  }
+
+
+
   return (
     <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Header showBackButton title="Add bundle" />
-      <main className="flex-grow overflow-y-auto pb-48">
-        <div className="p-4 space-y-4">
-          
-          <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-lg flex items-center gap-3 text-sm text-blue-800 dark:text-blue-200">
-            <Gift className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-            <span>Select your favorite services to see bundle deals!</span>
-          </div>
-
-          <div className="space-y-3">
-            {allServices.map(service => (
-              <ServiceCard 
-                key={service.id}
-                service={service}
-                Icon={serviceDisplayConfig[service.id as ServiceId].Icon}
-                title={serviceDisplayConfig[service.id as ServiceId].title}
-                isSelected={selectedServices.has(service.id as ServiceId)}
-                onToggle={() => handleServiceToggle(service.id as ServiceId)}
-                priceInfo={getPriceInfo(service.id as ServiceId)}
-                isConflicting={isNetflixConflict(service.id as ServiceId)}
-                isDisabled={
-                    !selectedServices.has(service.id as ServiceId) &&
-                    selectedServices.size >= MAX_SELECTION_LIMIT
-                }
-              />
-            ))}
-          </div>
+      {/* Header */}
+      <header className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex items-center justify-between p-4">
+          <button 
+            onClick={() => router.back()}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <ChevronLeft className="h-5 w-5 text-gray-900 dark:text-gray-100" />
+          </button>
+          <h1 className="text-lg font-medium text-gray-900 dark:text-white">Add bundle</h1>
+          <button className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800">
+            <Menu className="h-5 w-5 text-gray-900 dark:text-gray-100" />
+          </button>
         </div>
+      </header>
+
+      <main className="flex-grow px-4 py-6 pb-32">
+        {notification && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4" role="alert">
+            <span className="block sm:inline">{notification}</span>
+          </div>
+        )}
+
+        {isServiceListEmpty ? (
+          <div className="text-center py-20">
+            <div className="mx-auto h-24 w-24 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-4">
+              <AlertCircle className="h-12 w-12 text-gray-400" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">No Services Available</h2>
+            <p className="mt-2 text-gray-500 dark:text-gray-400">There are currently no subscription services to bundle.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Service List */}
+            <div className="space-y-3">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-white">Select services</h2>
+              
+              {allServices.map(service => {
+                const serviceId = service.id as ServiceId;
+                const isSelected = selectedServices.has(serviceId);
+                const priceInfo = getPriceInfo(serviceId);
+                const price = priceInfo.text.replace(/[^0-9.]/g, '') || '0';
+                const config = serviceDisplayConfig[serviceId as keyof typeof serviceDisplayConfig];
+                
+                return (
+                  <ServiceCard
+                    key={service.id}
+                    id={serviceId}
+                    name={service.name}
+                    description={service.description || 'Standard Plan'}
+                    price={parseFloat(price)}
+                    originalPrice={service.plans[0]?.price}
+                    isSelected={isSelected}
+                    onSelect={handleServiceToggle}
+                    logo={config?.Icon}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Billing Summary */}
+            <BillingSummary
+              total={total}
+              savings={savings}
+              services={selectedServicesList.map(s => ({
+                name: s.name,
+                price: s.price
+              }))}
+              isExpanded={isBillingExpanded}
+              onToggleExpand={() => setIsBillingExpanded(!isBillingExpanded)}
+              className="sticky bottom-24 z-10"
+            />
+          </div>
+        )}
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 z-10 w-full max-w-md mx-auto">
-        <div
-          onClick={() => setIsSummaryOpen(prev => !prev)}
-          className={cn("bg-white dark:bg-gray-800 rounded-t-2xl shadow-[0_-4px_12px_rgba(0,0,0,0.1)] transition-all duration-300 ease-in-out cursor-pointer", isSummaryOpen && "pb-safe-bottom")}
-        >
-          <div className="px-4 py-3 flex justify-between items-center w-full">
-              <div className="flex items-center gap-2">
-                   <h3 className="font-semibold text-base text-gray-800 dark:text-gray-200">
-                    Your Monthly Bill
-                   </h3>
-                   <ChevronUp className={cn("w-5 h-5 text-gray-500 transition-transform", !isSummaryOpen && "rotate-180")} />
-              </div>
-              <div className="flex items-center gap-3">
-                  {savings > 0 && (
-                     <span className="text-sm font-semibold text-green-600">Save {savings.toFixed(0)} THB</span>
-                  )}
-                  <span className="font-bold text-lg text-primary">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : `0 THB`}</span>
-              </div>
+      {/* Bottom Action Bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 p-4">
+        <div className="max-w-md mx-auto w-full">
+          <div className="flex items-center justify-between">
+            {selectedServices.size > 0 && (
+              <button 
+                onClick={() => setIsIssueExpanded(!isIssueExpanded)}
+                className={cn(
+                  "flex items-center px-3 py-2 rounded-full text-sm font-medium transition-colors",
+                  isIssueExpanded 
+                    ? "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                )}
+              >
+                <AlertCircle className="h-4 w-4 mr-1.5" />
+                <span>1 Issue</span>
+                {isIssueExpanded && <X className="h-4 w-4 ml-1.5" />}
+              </button>
+            )}
+            
+            <Button 
+              onClick={handleNextClick}
+              disabled={selectedServices.size === 0}
+              className={cn(
+                "flex-1 ml-2 bg-red-600 hover:bg-red-700 text-white font-medium py-2 px-4 rounded-full",
+                selectedServices.size === 0 && "opacity-50 cursor-not-allowed"
+              )}
+            >
+              Next
+            </Button>
           </div>
           
-          <div className={cn("overflow-hidden transition-all duration-300 ease-in-out", isSummaryOpen ? "max-h-screen opacity-100" : "max-h-0 opacity-0")}>
-             <div className="px-4 pb-4 space-y-4">
-                
-                {selectedServices.size > 0 ? (
-                  <div className="space-y-4 pt-2">
-                    <div>
-                      <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">Your Services</h4>
-                      <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                        {Array.from(selectedServices).map(id => {
-                          const service = subscriptionServices.find(s => s.id === id);
-                          if (!service) return null;
-                          const individualPrice = service.plans[0].price;
-                          return (
-                            <li key={id} className="flex justify-between items-center">
-                              <div className="flex items-center gap-2">
-                                <div className="w-5 flex justify-center">•</div>
-                                <span>{serviceDisplayConfig[id as ServiceId].title}</span>
-                              </div>
-                              <span className={cn(savings > 0 && "text-muted-foreground line-through")}>{individualPrice.toFixed(0)} THB</span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                
-                    {savings > 0 && (
-                       <div>
-                        <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2 text-base">Discount</h4>
-                        <ul className="space-y-1.5 text-sm">
-                          <li className="flex justify-between items-center">
-                            <div className="flex items-center gap-2">
-                              <div className="w-5 flex justify-center"></div>
-                              <span className="text-gray-700 dark:text-gray-300">Bundle Discount for {selectedServices.size} services</span>
-                            </div>
-                            <span className="font-medium text-green-600">-{savings.toFixed(0)} THB</span>
-                          </li>
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-4 text-muted-foreground">
-                    Please select at least one service.
-                  </div>
-                )}
-                
-                {nextBestOffer && (
-                    <Card 
-                        className="mt-4 bg-yellow-50 dark:bg-yellow-900/40 border-yellow-400 cursor-pointer hover:bg-yellow-100 dark:hover:bg-yellow-900/60"
-                        onClick={() => setSelectedServices(new Set(nextBestOffer.services as ServiceId[]))}
-                    >
-                        <div className="p-3">
-                            <p className="font-bold text-sm text-yellow-900 dark:text-yellow-200 mb-1">Special Offer!</p>
-                            <p className="text-xs text-yellow-800 dark:text-yellow-300">
-                                Add {nextBestOffer.services.length - selectedServices.size} more service(s) for just <span className="font-bold">{nextBestOffer.sellingPrice - total} THB</span> to get a discount!
-                            </p>
-                            <div className="flex items-center gap-2 mt-2">
-                                {nextBestOffer.services.filter(s => !selectedServices.has(s as ServiceId)).map(s_id => {
-                                    const s = serviceDisplayConfig[s_id as ServiceId];
-                                    return <s.Icon key={s_id} className="w-5 h-5" />;
-                                })}
-                            </div>
-                        </div>
-                    </Card>
-                )}
-
-                {!isValidBundle && selectedServices.size > 0 && !nextBestOffer && (
-                  <Card className="mt-4 bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800">
-                    <div className="p-3 flex items-center gap-3">
-                      <AlertCircle className="w-5 h-5 text-destructive" />
-                      <p className="text-sm text-destructive">No bundle available for this combination.</p>
-                    </div>
-                  </Card>
-                )}
-
-
-                <div className="flex justify-between items-end pt-4 border-t mt-2 dark:border-gray-700">
-                    <span className="text-base font-semibold text-gray-800 dark:text-gray-200">Total (excl. VAT)</span>
-                    <span className="font-bold text-2xl text-primary">{selectedServices.size > 0 ? `${total.toFixed(0)} THB` : '0 THB'}</span>
-                </div>
+          {isIssueExpanded && (
+            <div className="mt-3 p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-sm rounded-lg">
+              <p>You can only select one Netflix plan at a time. Please remove the current Netflix plan before selecting a different one.</p>
             </div>
-
-            <div className="px-4 pb-4 pt-2">
-                <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                        {[1, 2, 3, 4].map(step => (
-                            <div key={step} className={cn("h-1.5 rounded-full flex-1", selectedServices.size >= step ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-600')}></div>
-                        ))}
-                    </div>
-                     <Button 
-                        size="lg" 
-                        className="w-full bg-primary hover:bg-primary/90 rounded-full h-12 text-lg font-bold text-white" 
-                        disabled={selectedServices.size === 0}
-                        onClick={handleNext}
-                     >
-                        {selectedServices.size > 0 ? "Next" : "Choose your bundle"}
-                    </Button>
-                </div>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
-}
-
-interface ServiceCardProps {
-  service: SubscriptionService;
-  Icon: React.ElementType;
-  title: string;
-  isSelected: boolean;
-  onToggle: () => void;
-  priceInfo: { text: string; originalPrice?: string; type: 'bundle' | 'promo' | 'default' | 'none' };
-  isConflicting: boolean;
-  isDisabled: boolean;
-}
-
-function ServiceCard({ service, Icon, title, isSelected, onToggle, priceInfo, isConflicting, isDisabled }: ServiceCardProps) {
-  const finalIsDisabled = isDisabled && !isSelected;
-  
-  return (
-    <div
-      onClick={!finalIsDisabled ? onToggle : undefined}
-      className={cn(
-        'p-4 rounded-xl border-2 bg-white dark:bg-gray-800 transition-all',
-        isSelected ? 'border-primary bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700',
-        finalIsDisabled ? 'bg-gray-200 dark:bg-gray-700 border-gray-300 dark:border-gray-600 cursor-not-allowed opacity-60' : 'cursor-pointer'
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
-            <Checkbox 
-              checked={isSelected}
-              disabled={finalIsDisabled}
-              className={cn(
-                "w-5 h-5 mt-0.5 rounded border-2", 
-                isSelected ? "data-[state=checked]:bg-primary data-[state=checked]:border-primary" : "border-gray-400 dark:border-gray-500",
-                "text-white"
-              )} 
-            />
-            <div className="flex-1 flex items-center gap-3">
-              <Icon 
-                className={cn("w-10 h-10 object-contain shrink-0", service.id.startsWith('netflix') && 'w-7 h-10')} 
-                serviceId={service.id}
-              />
-              <div className="flex-grow min-w-0">
-                <span className={cn("font-bold text-base text-gray-800 dark:text-gray-200", finalIsDisabled && "text-gray-500")}>{title}</span>
-                <div className="min-h-[1.25rem] mt-1 pr-2">
-                  {isConflicting && <p className="text-xs text-destructive font-semibold">Only one Netflix plan allowed.</p>}
-                  {isDisabled && !isSelected && !isConflicting && <p className="text-xs text-destructive font-semibold">Maximum of {MAX_SELECTION_LIMIT} services allowed.</p>}
-                </div>
-              </div>
-            </div>
-        </div>
-
-        <div className="text-right flex-shrink-0">
-            {isConflicting && priceInfo.text.startsWith('+0') ? (
-              <>
-                {priceInfo.originalPrice && <p className="text-sm text-muted-foreground line-through">{priceInfo.originalPrice}</p>}
-                <p className="font-bold text-lg text-green-600">+0 THB</p>
-              </>
-            ) : priceInfo.text && (
-              <>
-                {priceInfo.originalPrice && <p className="text-sm text-muted-foreground line-through">{priceInfo.originalPrice}</p>}
-                <p className={cn(
-                  "font-bold text-lg whitespace-nowrap",
-                  priceInfo.type === 'promo' ? 'text-primary' : 
-                  priceInfo.text.startsWith('+') ? 'text-green-600' : 'text-gray-800 dark:text-gray-300'
-                )}>
-                  {priceInfo.text}
-                </p>
-              </>
-            )}
+          )}
         </div>
       </div>
-       {(isSelected || (isConflicting && !isDisabled)) && (
-        <div className="pl-12 mt-3 space-y-1 text-gray-600 dark:text-gray-400 text-sm">
-            {service.plans[0].features.map((feature, index) => (
-                <div key={index} className="flex items-center gap-2">
-                    <Tv className="w-4 h-4"/>
-                    <span>{feature}</span>
-                </div>
-            ))}
-        </div>
-      )}
     </div>
-  )
+  );
 }
