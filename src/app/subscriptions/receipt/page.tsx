@@ -194,12 +194,22 @@ function ReceiptContent() {
         </Card>
 
         {/* Action Button */}
-        <div className="mt-6">
+        <div className="mt-6 space-y-3">
           <Button 
             onClick={handleGoToSubscriptions}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-lg font-semibold"
           >
             View My Subscriptions
+          </Button>
+          
+          <Button 
+            onClick={() => {
+              const bundleQuery = bundleParam ? `?bundle=${bundleParam}` : '';
+              router.push(`/subscriptions/activation${bundleQuery}`);
+            }}
+            className="w-full bg-red-600 hover:bg-red-700 text-white py-3 text-lg font-semibold"
+          >
+            Activate Services
           </Button>
         </div>
       </main>

@@ -75,8 +75,9 @@ function CheckoutContent() {
   }, [selectedServices]);
 
   const handleCheckout = () => {
-    // Navigate to payment/confirmation page
-    router.push('/subscriptions/confirm');
+    // Navigate directly to activation page with bundle parameter
+    const bundleQuery = bundleParam ? `?bundle=${bundleParam}` : '';
+    router.push(`/subscriptions/activation${bundleQuery}`);
   };
 
   if (!bundleDetails) {

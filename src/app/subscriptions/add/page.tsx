@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/layout/header';
 import { subscriptionServices, offerGroups } from '@/lib/data';
 import type { SubscriptionService, OfferGroup, ServiceId } from '@/lib/types';
@@ -22,7 +22,7 @@ import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carouse
 import Autoplay from "embla-carousel-autoplay"
 
 const serviceDisplayConfig: Record<ServiceId, { Icon: React.ElementType; title: string }> = {
-  youtube: { Icon: YouTubeIcon, title: 'Youtube Premium' },
+  youtube: { Icon: YouTubeIcon, title: 'YoutubePremium' },
   viu: { Icon: ViuIcon, title: 'VIU' },
   'netflix-mobile': { Icon: NetflixIcon, title: 'Netflix Mobile' },
   iqiyi: { Icon: IQIYIIcon, title: 'iQIYI VIP Standard' },
@@ -144,6 +144,24 @@ export default function AddBundlePage() {
   const [selectedServices, setSelectedServices] = useState<Set<ServiceId>>(new Set([]));
   const [isSummaryOpen, setIsSummaryOpen] = useState(true);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Parse bundle query parameter and auto-select services
+  useEffect(() => {
+    const bundleParam = searchParams.get('bundle');
+    if (bundleParam) {
+      const serviceIds = bundleParam.split(',').filter(id => id.trim()) as ServiceId[];
+      
+      // Validate service IDs and limit to max 4
+      const validServiceIds = serviceIds
+        .filter(id => subscriptionServices.some(service => service.id === id))
+        .slice(0, MAX_SELECTION_LIMIT);
+      
+      if (validServiceIds.length > 0) {
+        setSelectedServices(new Set(validServiceIds));
+      }
+    }
+  }, [searchParams]);
 
   const handleServiceToggle = (serviceId: ServiceId) => {
     setSelectedServices(prev => {
@@ -378,6 +396,9 @@ export default function AddBundlePage() {
   
   const handleNext = () => {
     if (selectedServices.size === 0) return;
+    const matchedOffer = findBestOffer(selectedServices);
+    const isExact = !!matchedOffer && matchedOffer.services.length === selectedServices.size;
+    if (!isExact) return;
     const serviceIds = Array.from(selectedServices).join(',');
     router.push(`/subhub/checkout?bundle=${serviceIds}`);
   };
@@ -387,7 +408,7 @@ export default function AddBundlePage() {
   );
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-100">
       {/* Custom Header matching the reference UI */}
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center">
         <button 
@@ -400,7 +421,7 @@ export default function AddBundlePage() {
       </div>
 
       <main className="flex-grow overflow-y-auto pb-48">
-        <div className="p-4 space-y-6">
+        <div className="p-4 space-y-4">
           
           {/* Promotional Carousel matching the reference UI */}
           <div className="mb-6">
@@ -672,14 +693,18 @@ export default function AddBundlePage() {
                   size="lg" 
                   className={cn(
                     "w-full rounded-full h-10 text-base font-bold",
-                    selectedServices.size === 0 || (selectedServices.size < 4 && !isValidBundle)
+                    selectedServices.size === 0 || !isValidBundle
                       ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                       : "bg-red-600 hover:bg-red-700 text-white"
                   )}
-                  disabled={selectedServices.size === 0 || (selectedServices.size < 4 && !isValidBundle)}
+                  disabled={selectedServices.size === 0 || !isValidBundle}
                   onClick={handleNext}
                 >
-                  {selectedServices.size === 0 ? "เริ่มต้นสร้าง" : (selectedServices.size === 4 ? "ถัดไป" : (isValidBundle ? "ถัดไป" : "เลือกแพ็กเกจเพื่อดำเนินการต่อ"))}
+                  {selectedServices.size === 0
+                    ? "เริ่มต้นสร้าง"
+                    : isValidBundle
+                      ? "ถัดไป"
+                      : "เลือกแพ็กเกจเพื่อดำเนินการต่อ"}
                 </Button>
               </div>
             </div>
@@ -723,20 +748,9 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
         return 119; // Default promotional price
     };
 
-    // Get actual public price (what users would pay elsewhere)
+    // Get actual public price (what users would pay elsewhere) - using 1000 THB as shown in reference
     const getPublicPrice = () => {
-        if (service.id === 'youtube') return 179;
-        if (service.id === 'viu') return 89;
-        if (service.id === 'netflix-mobile') return 199;
-        if (service.id === 'iqiyi') return 89;
-        if (service.id === 'wetv') return 59;
-        if (service.id === 'oned') return 59;
-        if (service.id === 'trueplus') return 119;
-        if (service.id === 'trueidshort') return 90;
-        if (service.id === 'netflix-basic') return 199;
-        if (service.id === 'netflix-standard') return 299;
-        if (service.id === 'netflix-premium') return 419;
-        return 119; // Default public price
+        return 1000; // All services show 1,000 THB as original price in reference
     };
 
     const promotionalPrice = getPromotionalPrice();
@@ -746,44 +760,58 @@ function ServiceCard({ service, Icon, title, isSelected, onToggle, selectedServi
     <Card
       onClick={!isDisabled ? onToggle : undefined}
       className={cn(
-        'p-4 rounded-xl border bg-white transition-all flex items-center gap-4 relative',
+        'p-4 rounded-xl border bg-white shadow-sm transition-all flex items-center gap-4 relative',
         isSelected ? 'border-red-500 shadow-lg' : 'border-gray-200',
         isDisabled ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-60' : 'cursor-pointer hover:shadow-md'
       )}
     >
         {/* Service Icon */}
-        <Icon 
-          serviceid={service.id}
-          className={cn("w-12 h-12 object-contain shrink-0", service.id.startsWith('netflix') && 'w-8 h-12')} 
-        />
+        <div className={cn(
+          "w-12 h-12 rounded-lg flex items-center justify-center shrink-0",
+          service.id === 'youtube' && "bg-red-50",
+          service.id === 'trueplus' && "bg-gray-200",
+          service.id === 'trueidshort' && "bg-orange-100",
+          service.id === 'viu' && "bg-yellow-100",
+          !['youtube', 'trueplus', 'trueidshort', 'viu'].includes(service.id) && "bg-gray-100"
+        )}>
+          <Icon 
+            serviceid={service.id}
+            className={cn("w-8 h-8 object-contain", service.id.startsWith('netflix') && 'w-6 h-8')} 
+          />
+        </div>
         
         {/* Service Details */}
         <div className="flex-grow min-w-0">
-          <p className="font-bold text-base text-gray-900 mb-1">{title}</p>
-          <div className="flex items-center gap-2">
+          <p className="font-semibold text-base text-gray-900 mb-1">{title}</p>
+          <div className="flex flex-col gap-1">
             <span className="font-bold text-lg text-red-600">+{promotionalPrice} THB</span>
-            <span className="text-sm text-gray-500 line-through">{publicPrice.toLocaleString()} THB</span>
+            <span className="text-sm text-gray-400 line-through">{publicPrice.toLocaleString()} THB</span>
           </div>
         </div>
         
-        {/* Add Button */}
+        {/* Action Button */}
         <Button
           size="sm"
           className={cn(
-            "rounded-full px-6 py-2 font-semibold transition-all",
+            "rounded-full px-6 py-2 font-semibold transition-all border-2 h-10",
             isSelected 
-              ? "bg-red-600 text-white" 
-              : "bg-red-600 hover:bg-red-700 text-white"
+              ? "bg-red-600 text-white border-red-600" 
+              : "bg-white text-red-600 border-red-600 hover:bg-red-50"
           )}
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
           }}
         >
-          {isSelected ? "✓ Added" : "Add"}
+          {isSelected ? (
+            <>
+              <Check className="w-4 h-4 mr-1" />
+              Added
+            </>
+          ) : (
+            "Add"
+          )}
         </Button>
-         
-         {/* Remove the constraint message since services are independent */}
      </Card>
   )
 }
